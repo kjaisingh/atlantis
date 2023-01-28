@@ -17,6 +17,8 @@
   },
   "homepage": "https://github.com/aakashjajoo1/atlantis#readme",
   "dependencies": {
+    "amadeus": "^7.1.0",
+    "axios": "^1.2.4",
     "ejs": "^3.1.8",
     "express": "^4.18.2"
   },

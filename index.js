@@ -34,12 +34,18 @@ function filterResults(results) {
 	return results[0];
 }
 
-findAllDestinations('ABR', 'MSP', '2023-05-01', '2').then(result => 
-	{
-		console.log(result);
-	}).catch(err => {
-		console.log(err);
-	})
+export function callDest() {
+
+	findAllDestinations('ABR', 'MSP', '2023-05-01', '2').then(result => 
+		{
+			return result;
+		}).catch(err => {
+			console.log(err);
+		})
+
+}
+
+
 
 // function manipulateJSON() {
 

@@ -7,13 +7,14 @@ var amadeus = new Amadeus({
 
 async function oneWaySearch (origin, dest, date, num_adults) {
   try {
-    const x = await amadeus.shopping.flightOffersSearch.get({
-      originLocationCode: origin,
-      destinationLocationCode: dest,
-      departureDate: date,
-      adults: num_adults    
-    })
-    return x.data[0].itineraries[0].segments;
+    // const x = await amadeus.shopping.flightOffersSearch.get({
+    //   originLocationCode: origin,
+    //   destinationLocationCode: dest,
+    //   departureDate: date,
+    //   adults: num_adults    
+    // })
+    // return x.data[0].itineraries[0].segments;
+    return "abc";
   }  
   catch (err) {
     return err;

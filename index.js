@@ -3,12 +3,13 @@ const express = require('express');
 const routes = require('./routes.js');
 const api = require('./api.js');
 const cacheTable = require('./modified.json');
+const exampleResults = require('./example_data.json');
 
 
 // Express initialization
 const app = express();
 
-async function findAllDestinations(origin, dest, date, num_adults) {
+async function findAllFlights(origin, dest, date, num_adults) {
 	try {
 
 		const requisiteRow = cacheTable.filter(function (entry) {
@@ -16,33 +17,55 @@ async function findAllDestinations(origin, dest, date, num_adults) {
 		});
 
 		const zArrayFromRow = requisiteRow[0].Z;
+		var results = []
 		const directSearch = await api.oneWaySearch(origin, dest, date, num_adults);
-		const results = [directSearch];
+		results = results.concat(directSearch);
 		for (let i = 0; i < zArrayFromRow.length; i++) {
 			const res = await api.oneWaySearch(origin, zArrayFromRow[i], date, num_adults);
-			results.push(res);
+			const filtered = filterJSONResult(res, dest)
+			results = results.concat(filtered);
 		}
-		return filterResults(results);
 
+		return results;
 	} catch (e) {
 		console.log(e);
 		return e;
 	}
 }
 
-function filterResults(results) {
-	return results[0];
+function printAllSourceDest(data) {
+	for (let i = 0; i < data.length; i++) {
+		const curr = data[i].itineraries[0].segments;
+		arrList = []
+		for(let j = 0; j < curr.length; j++) {
+			const dep = curr[j].departure.iataCode;
+			const arr = curr[j].arrival.iataCode;
+			console.log("DEP:", dep);
+			console.log("ARR:", arr);
+		}
+		console.log();
+	  }
 }
 
-export function callDest() {
+function filterJSONResult(dataToFilter, dest) {
 
-	findAllDestinations('ABR', 'MSP', '2023-05-01', '2').then(result => 
-		{
-			return result;
-		}).catch(err => {
-			console.log(err);
-		})
-
+	try {
+		var finList = []
+		for (let i = 0; i < dataToFilter.length; i++) {
+			const curr = dataToFilter[i].itineraries[0].segments;
+			var arrList = []
+			for(let j = 0; j < curr.length; j++) {
+				const arr = curr[j].arrival.iataCode;
+				arrList.push(arr);
+			}
+			if (arrList.includes(dest)) {
+				finList = finList.concat(dataToFilter[i]);
+			}
+		  }
+		  return finList;
+	} catch (e) {	
+		console.log(e);
+	}
 }
 
 
@@ -63,6 +86,9 @@ export function callDest() {
 // 	} catch (e) {	
 // 	}
 // }
+
+
+
 
 
 // Routes declaration

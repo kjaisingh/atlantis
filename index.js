@@ -3,7 +3,6 @@ const express = require('express');
 const routes = require('./routes.js');
 const api = require('./api.js');
 const cacheTable = require('./modified.json');
-const exampleResults = require('./example_data.json');
 
 
 // Express initialization

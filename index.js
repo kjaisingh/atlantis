@@ -3,6 +3,7 @@ const express = require('express');
 const routes = require('./routes.js');
 const api = require('./api.js');
 const cacheTable = require('./modified.json');
+const sleep = require('sleep');
 
 
 // Express initialization
@@ -88,15 +89,21 @@ function filterJSONResult(dataToFilter, dest) {
 
 
 
+function asyncSubJob() { 
+	console.log('Starting subscription job')
 
+	console.log('Finished subscription job')
+
+}
 
 // Routes declaration
 app.use('/public', express.static('public'));
 app.use('/', routes.get_home);
 
-
 // Initialize server
 const port = 3000;
 const server = app.listen(port, () => {
 	console.log(`Now listening on port ${port}`);
+	setInterval(asyncSubJob, 60 * 1000) // 60seconds
 });
+

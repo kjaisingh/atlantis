@@ -110,7 +110,7 @@ module.exports = {
     getAllHiddenCities,
     getAllSubscriptions,
     getHiddenCities,
-    scanSubscriptionTable,
+    // scanSubscriptionTable,
     test,
     testGetCity,
 };

@@ -130,5 +130,4 @@ module.exports = {
     getAllHiddenCities,
     getAllSubscriptions,
     getHiddenCities,
-    testGetCity,
 };

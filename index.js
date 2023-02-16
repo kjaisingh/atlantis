@@ -68,7 +68,13 @@ function filterJSONResult(dataToFilter, dest) {
 	}
 }
 
-function asyncSubJob() {
+/** 
+ * Iterates through entire Subscription Table.
+ * If a desired flight's date has expired, the subscription is removed from the table.
+ * Otherwise, it finds the cheapest flight for the given subscription.
+ * If the price is cheaper than the given threshold, a Twilio text notification is sent and the subscription is deleted.
+ */
+function asyncSubscribeJob() {
 	console.log('Starting subscription job')
 	db.getAllSubscriptions(function (err, data) {
 		data.Items.forEach(entry => {
@@ -99,8 +105,6 @@ function asyncSubJob() {
 						notif += `Thanks for being an Atlantis customer!`
 						api.sendTxtNotif(notif, entry.mobile_number.S)
 						db.deleteSubscription(entry.itinerary.S, entry.mobile_number.S)
-					} else {
-						api.sendTxtNotif("failed", entry.mobile_number.S)
 					}
 				})
 			}
@@ -116,8 +120,9 @@ app.use('/', routes.get_home);
 const port = 3000;
 const server = app.listen(port, () => {
 	console.log(`Now listening on port ${port}`);
-	//console.log(results[10].itineraries[0].segments)
-	asyncSubJob()
-	// setInterval(asyncSubJob, 60 * 1000) // 60seconds
+	// asyncSubscribeJob()
+
+	// Comment this in to constantly refresh and notify
+	// setInterval(asyncSubscribeJob, 60 * 1000) // 60seconds
 });
 

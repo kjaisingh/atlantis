@@ -7,8 +7,12 @@ var docClient = new AWS.DynamoDB.DocumentClient()
 const CacheTableName = "HiddenCities"
 const SubscriptionTableName = "Subscriptions"
 
-// Cache Table Functions
+//--------------------------Cache Table Functions--------------------------------//
 
+/**
+ * Returns the entire Cache Table
+ * For each item: "Source" is the source IATA, "Destination" is the destination IATA, and "HiddenCities" is a list of IATAs
+ */
 function getAllHiddenCities() {
     const params = {
         TableName: CacheTableName,
@@ -24,6 +28,12 @@ function getAllHiddenCities() {
     });
 }
 
+/** Fetches the Cache Table for a given (source,destination) pair
+ * 
+ * @param source: Source IATA
+ * @param destination: Destination IATA
+ * @returns A list of IATAs
+ */
 async function getHiddenCities(source, destination) {
     const params = {
         TableName: CacheTableName,
@@ -36,13 +46,19 @@ async function getHiddenCities(source, destination) {
     return await db.getItem(params).promise()
 }
 
-async function testGetCity() {
-    x = await getHiddenCities("JFK", "LAX");
-    console.log(x.Item);
-}
 
-// Subscription Table Functions
+//--------------------------Subscription Table Functions--------------------------------//
 
+/** 
+ * Adds a subscription to the DynamoDB Subscription Table
+ * 
+ * @param source: source IATA, eg. "LAX"
+ * @param destination: destination IATA, eg. "JFK"
+ * @param date: flight date YYYY-MM-DD, eg. "2023-05-31"
+ * @param price_threshold: price threshold under which to be notified, eg. "250"
+ * @param name: name of user, eg. "John Doe"
+ * @param mobile_number: mobile number of user +1-xxx-xxx-xxxx, eg +1-123-456-7890
+ */
 function addSubscription(source, destination, date, price_threshold, name, mobile_number) {
     const today = new Date().toISOString().split('T')[0]; // format is "2016-02-18"
 
@@ -66,6 +82,9 @@ function addSubscription(source, destination, date, price_threshold, name, mobil
     });
 }
 
+/**
+ * Returns all subscriptions currently in the DynamoDB Subscription Table
+ */
 function getAllSubscriptions(callback) {
     const params = {
         TableName: SubscriptionTableName,
@@ -82,6 +101,12 @@ function getAllSubscriptions(callback) {
     });
 }
 
+/**
+ * Deletes a subscription from the DynamoDB Subscription Table
+ * 
+ * @param itinerary: the itinerary to delete, eg. "LAX+JFK+2023-05-01"
+ * @param mobile_number: the mobile number used for the subscription, eg. "+1-xxx-xxx-xxxx"
+ */
 function deleteSubscription(itinerary, mobile_number) {
     const params = {
         TableName: SubscriptionTableName,
@@ -100,11 +125,6 @@ function deleteSubscription(itinerary, mobile_number) {
     });
 }
 
-async function test() {
-    data = await scanSubscriptionTable();
-    console.log(data);
-}
-
 
 module.exports = {
     addSubscription,
@@ -112,7 +132,5 @@ module.exports = {
     getAllHiddenCities,
     getAllSubscriptions,
     getHiddenCities,
-    // scanSubscriptionTable,
-    test,
     testGetCity,
 };

@@ -60,8 +60,6 @@ async function getHiddenCities(source, destination) {
  * @param mobile_number: mobile number of user +1-xxx-xxx-xxxx, eg +1-123-456-7890
  */
 function addSubscription(source, destination, date, price_threshold, name, mobile_number) {
-    const today = new Date().toISOString().split('T')[0]; // format is "2016-02-18"
-
     const itinerary = source + '+' + destination + '+' + date
     const params = {
         TableName: SubscriptionTableName,

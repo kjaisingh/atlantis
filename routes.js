@@ -24,7 +24,8 @@ var getHome = function (req, res) {
 			"price": "$502",
 		},
 	];
-	res.render("home.ejs", { data : data });
+
+	res.render("home.ejs", { data: data });
 };
 
 // Exports

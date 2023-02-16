@@ -45,7 +45,8 @@ async function testGetCity() {
 
 function addSubscription(source, destination, date, price_threshold, name, mobile_number) {
     const today = new Date().toISOString().split('T')[0]; // format is "2016-02-18"
-    const itinerary = source + '+' + destination + '+' + today
+
+    const itinerary = source + '+' + destination + '+' + date
     const params = {
         TableName: SubscriptionTableName,
         Item: {
@@ -65,7 +66,7 @@ function addSubscription(source, destination, date, price_threshold, name, mobil
     });
 }
 
-function getAllSubscriptions() {
+function getAllSubscriptions(callback) {
     const params = {
         TableName: SubscriptionTableName,
     };
@@ -73,9 +74,10 @@ function getAllSubscriptions() {
     db.scan(params, function (err, data) {
         if (err) {
             console.error("Unable to find cities", err);
+            callback(err)
         } else {
             console.log(`Found ${data.Count} cities`);
-            console.log(data.Items);
+            callback(err, data)
         }
     });
 }

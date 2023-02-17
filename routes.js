@@ -24,8 +24,6 @@ var getHome = function (req, res) {
 			"price": "$502",
 		},
 	];
-
-	db.addSubscription("JFK", "LAX", "1234", "250", "5", "628749832749832")
 	res.render("home.ejs", { data : data });
 };
 

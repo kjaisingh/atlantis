@@ -4,14 +4,14 @@ const routes = require('./routes.js');
 const api = require('./api.js');
 const cacheTable = require('./modified.json');
 var db = require("./database.js");
+const jsonData = require("./test_pruned.json");
 
 
 // Express initialization
 const app = express();
 
-async function findAllFlights(origin, dest, date, num_adults) {
+async function findAllOneWayFlights(origin, dest, date, num_adults) {
 	try {
-
 		const requisiteRow = cacheTable.filter(function (entry) {
 			return entry.X === origin && entry.Y == dest;
 		});
@@ -26,12 +26,57 @@ async function findAllFlights(origin, dest, date, num_adults) {
 			results = results.concat(filtered);
 		}
 
-		return results;
+		results2 = []
+		for (let j = 0; j < results.length; j++) {
+			const getEach = results[j];
+			results2.push(filterOneWayResult(getEach));
+		}
+
+		// const FileSystem = require("fs");
+		// FileSystem.writeFile('test_pruned.json', JSON.stringify(results2), (error) => {
+		// 	 if (error) throw error;
+		// });
+
+		return results2;
 	} catch (e) {
 		console.log(e);
 		return e;
 	}
 }
+
+async function randomTest() {
+	dat = await api.oneWaySearch('JFK', 'SAV', '2023-02-22', 1);
+	console.log(dat);
+	results2 = []
+	for (let j = 0; j < dat.length; j++) {
+			const getEach = dat[j];
+			results2.push(filterOneWayResult(getEach));
+	}
+	const FileSystem = require("fs");
+	FileSystem.writeFile('test_pruned_2.json', JSON.stringify(results2), (error) => {
+		 if (error) throw error;
+	});
+}
+
+//randomTest();
+
+function filterOneWayResult(currResult) {
+
+	const mergeById = (a1, a2) =>
+    a1.map(itm => ({
+        ...a2.find((item) => (item.segmentId === itm.id) && item),
+        ...itm
+    }));
+
+	resultObject = {}
+	resultObject.duration = currResult.itineraries[0].duration;
+	resultObject.segments = mergeById(currResult.itineraries[0].segments, currResult.travelerPricings[0].fareDetailsBySegment)
+	resultObject.price = currResult.price.total;
+	return resultObject;
+}
+
+// findAllOneWayFlights('JFK', 'MIA', '2023-02-22', 1);
+
 
 function printAllSourceDest(data) {
 	for (let i = 0; i < data.length; i++) {

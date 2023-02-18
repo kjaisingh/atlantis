@@ -20,6 +20,7 @@ async function sendTxtNotif(body, to) {
 }
 
 async function oneWaySearch(origin, dest, date, num_adults) {
+  console.log("Searching", origin, "to", dest);
   try {
     const x = await amadeus.shopping.flightOffersSearch.get({
       originLocationCode: origin,
@@ -35,7 +36,25 @@ async function oneWaySearch(origin, dest, date, num_adults) {
   }
 }
 
+async function twoWaySearch(origin, dest, depart_date, return_date, num_adults) {
+  try {
+    const x = await amadeus.shopping.flightOffersSearch.get({
+      originLocationCode: origin,
+      destinationLocationCode: dest,
+      departureDate: depart_date,
+      returnDate: return_date,
+      adults: num_adults,
+      currencyCode: "USD"
+    })
+    return x.data;
+  }
+  catch (err) {
+    return err;
+  }
+}
+
 module.exports = {
   oneWaySearch,
+  twoWaySearch,
   sendTxtNotif
 };

@@ -68,7 +68,7 @@ function filterJSONResult(dataToFilter, dest) {
 	}
 }
 
-/** 
+/**
  * Iterates through entire Subscription Table.
  * If a desired flight's date has expired, the subscription is removed from the table.
  * Otherwise, it finds the cheapest flight for the given subscription.
@@ -115,6 +115,8 @@ function asyncSubscribeJob() {
 // Routes declaration
 app.use('/public', express.static('public'));
 app.use('/', routes.get_home);
+app.use('/search', routes.get_search);
+app.use('/subscribe', routes.post_subscribe);
 
 // Initialize server
 const port = 3000;

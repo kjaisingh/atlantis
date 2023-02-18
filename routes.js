@@ -30,8 +30,20 @@ var getHome = function (req, res) {
 	res.render("home.ejs", { data: flights, options: airports });
 };
 
+// GET /search - searches for a given flight
+var getSearch = function (req, res) {
+
+}
+
+// POST /subscribe - creates a subscription
+var postSubscribe = function (req, res) {
+
+}
+
 // Exports
 var routes = {
 	get_home: getHome,
+	get_search: getSearch,
+	post_subscribe: postSubscribe,
 };
 module.exports = routes;

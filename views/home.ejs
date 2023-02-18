@@ -23,8 +23,11 @@
       rel="stylesheet"
     />
     <link href="public/css/styles.css" rel="stylesheet" type="text/css" />
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="js/scripts.js"></script>
   </head>
 
+  <!-- Header -->
   <body id="page-top">
     <nav class="navbar navbar-expand-lg navbar-dark navbar-custom fixed-top">
       <div class="container px-5 justify-content-center">
@@ -42,6 +45,8 @@
         </button>
       </div>
     </nav>
+
+    <!-- Start Image -->
     <header class="masthead text-center text-white">
       <div class="masthead-content">
         <div class="container px-5">
@@ -58,6 +63,7 @@
       <div class="bg-circle-4 bg-circle"></div>
     </header>
 
+    <!-- Route Filter -->
     <section id="scroll">
       <div class="container px-5">
         <div class="wrapper bg-white">
@@ -79,24 +85,18 @@
               <div
                 class="d-flex align-items-center flex-fill me-sm-1 my-sm-0 my-4 border-bottom position-relative"
               >
-                <input
-                  type="text"
-                  required
-                  placeholder="From"
-                  class="form-control"
-                />
+                <input type="text" required placeholder="From"
+                  class="form-control" list="airports-from"/>
+                <datalist id="airports-from"></datalist>
                 <div class="label" id="from"></div>
                 <span class="fas fa-dot-circle text-muted"></span>
               </div>
               <div
                 class="d-flex align-items-center flex-fill ms-sm-1 my-sm-0 my-4 border-bottom position-relative"
               >
-                <input
-                  type="text"
-                  required
-                  placeholder="To"
-                  class="form-control"
-                />
+                <input type="text" required placeholder="To"
+                  class="form-control" list="airports-to"/>
+                <datalist id="airports-to"></datalist>
                 <div class="label" id="to"></div>
                 <span class="fas fa-map-marker text-muted"></span>
               </div>
@@ -128,12 +128,7 @@
             <div
               class="form-group border-bottom d-flex align-items-center position-relative"
             >
-              <input
-                type="text"
-                required
-                placeholder="Traveller(s)"
-                class="form-control"
-              />
+              <input type="text" required placeholder="Traveller(s)" class="form-control" />
               <div class="label" id="psngr"></div>
               <span class="fas fa-users text-muted"></span>
             </div>
@@ -149,6 +144,25 @@
       </div>
     </section>
 
+    <!-- Populating Dropdowns -->
+    <script>
+      var options = "<%= options %>".split(",");
+      var datalistFrom = document.getElementById("airports-from");
+      var datalistTo = document.getElementById("airports-to");
+
+      options.forEach(function (item){
+        var option = document.createElement('option');
+        option.value = item;
+        datalistFrom.appendChild(option);
+      });
+      options.forEach(function (item){
+        var option = document.createElement('option');
+        option.value = item;
+        datalistTo.appendChild(option);
+      });
+    </script>
+
+    <!-- Results Table -->
     <section>
       <div class="container px-5">
         <div class="row">
@@ -198,6 +212,7 @@
       </div>
     </section>
 
+    <!-- Footer -->
     <footer class="py-5 bg-black">
       <div class="container px-5">
         <p class="m-0 text-center text-white small">
@@ -205,8 +220,5 @@
         </p>
       </div>
     </footer>
-
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="js/scripts.js"></script>
   </body>
 </html>

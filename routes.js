@@ -1,10 +1,11 @@
 // Imports
 var db = require("./database.js");
+var fs = require("fs");
 
 // Routes
 // GET / - displays home page
 var getHome = function (req, res) {
-	var data = [
+	var flights = [
 		{
 			"airline": "American Airlines",
 			"path": "SFO --> PHL --> NYC",
@@ -25,7 +26,8 @@ var getHome = function (req, res) {
 		},
 	];
 
-	res.render("home.ejs", { data: data });
+	var airports = fs.readFileSync("views/table-data.txt").toString('utf-8').split("\n");
+	res.render("home.ejs", { data: flights, options: airports });
 };
 
 // Exports

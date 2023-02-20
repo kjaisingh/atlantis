@@ -29,7 +29,7 @@ function getAllHiddenCities() {
 }
 
 /** Fetches the Cache Table for a given (source,destination) pair
- * 
+ *
  * @param source: Source IATA
  * @param destination: Destination IATA
  * @returns A list of IATAs
@@ -49,9 +49,9 @@ async function getHiddenCities(source, destination) {
 
 //--------------------------Subscription Table Functions--------------------------------//
 
-/** 
+/**
  * Adds a subscription to the DynamoDB Subscription Table
- * 
+ *
  * @param source: source IATA, eg. "LAX"
  * @param destination: destination IATA, eg. "JFK"
  * @param date: flight date YYYY-MM-DD, eg. "2023-05-31"
@@ -101,7 +101,7 @@ function getAllSubscriptions(callback) {
 
 /**
  * Deletes a subscription from the DynamoDB Subscription Table
- * 
+ *
  * @param itinerary: the itinerary to delete, eg. "LAX+JFK+2023-05-01"
  * @param mobile_number: the mobile number used for the subscription, eg. "+1-xxx-xxx-xxxx"
  */

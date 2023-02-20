@@ -37,7 +37,20 @@ var getSearch = function (req, res) {
 
 // POST /subscribe - creates a subscription
 var postSubscribe = function (req, res) {
+	var source = req.body.source;
+	var destination = req.body.destination;
+	var date = req.body.date;
+	var threshold = req.body.threshold;
+	var name = req.body.name;
+	var number = req.body.number;
 
+	db.addSubscription(source, destination, date, threshold, name, number, function (err, data) {
+		if (err) {
+			res.redirect("/home")
+		} else {
+			res.send({success: true})
+		}
+	})
 }
 
 // Exports

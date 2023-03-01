@@ -1,8 +1,9 @@
 var Amadeus = require('amadeus');
+const config = require('./config.json')
 
 var amadeus = new Amadeus({
-  clientId: 'qZG6sPsYzKEWfvXpegU1snPZvjqAYKW3',
-  clientSecret: 'oxZUUWnaXAYXPG0T'
+  clientId: config.clientId,
+  clientSecret: config.clientSecret
 });
 
 const accountSid = "ACed5c638cdc16064ccf9be937ac79952a"

@@ -1,9 +1,11 @@
 var axios = require('axios');
 
 async function oneWayLookup(origin, dest, departure_date, passengers) {
-    oneAdult = {
-        "type": "adult"
-      }
+
+  console.log("Searching from flights from", origin, "to", dest);
+  oneAdult = {
+      "type": "adult"
+    }
 
     var data = {
         "data": {
@@ -41,16 +43,29 @@ async function oneWayLookup(origin, dest, departure_date, passengers) {
       };
 
 
-    axios(config)
-    .then(function (response) {
+    // axios(config)
+    // .then(function (response) {
+    //   const FileSystem = require("fs");
+    //   FileSystem.writeFile('duffel_test_3.json', JSON.stringify(response.data), (error) => {
+    //        if (error) throw error;
+    //   });
+    //   return response.data;
+    // })
+    // .catch(function (error) {
+    //   console.log(error);
+    // });
+    
+    try {
+      const response = await axios(config);
       const FileSystem = require("fs");
-      FileSystem.writeFile('duffel_test_2.json', JSON.stringify(response.data), (error) => {
+      FileSystem.writeFile('duffel_test_4.json', JSON.stringify(response.data), (error) => {
            if (error) throw error;
       });
-    })
-    .catch(function (error) {
-      console.log(error);
-    });
+      return response.data.data;
+    } catch (err) {
+      return err;
+    }
+    
 }
 
 module.exports = {

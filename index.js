@@ -5,11 +5,12 @@ const api = require('./api.js');
 const duffel = require('./duffel_api.js');
 const cacheTable = require('./modified.json');
 var db = require("./database.js");
-const jsonData = require("./test_pruned.json");
+//const jsonData = require("./result_test.json");
 
 
 // Express initialization
 const app = express();
+
 
 async function findAllOneWayFlights(origin, dest, date, num_adults) {
 	try {
@@ -19,23 +20,33 @@ async function findAllOneWayFlights(origin, dest, date, num_adults) {
 
 		const zArrayFromRow = requisiteRow[0].Z;
 		var results = []
-		const directSearch = await api.oneWaySearch(origin, dest, date, num_adults);
-		results = results.concat(directSearch);
+		const directSearch = await duffel.oneWayLookup(origin, dest, date, num_adults);
+		//console.log("Direct:", directSearch)
+		results = results.concat(directSearch.offers);
 		for (let i = 0; i < zArrayFromRow.length; i++) {
-			const res = await api.oneWaySearch(origin, zArrayFromRow[i], date, num_adults);
-			const filtered = filterJSONResult(res, dest)
+			const res = await duffel.oneWayLookup(origin, zArrayFromRow[i], date, num_adults);
+			const filtered = filterJSONResult(res.offers, dest)
 			results = results.concat(filtered);
 		}
+
+		const FileSystem = require("fs");
+		// FileSystem.writeFile('random.json', JSON.stringify(results), (error) => {
+        //    if (error) throw error;
+		// });
 
 		results2 = []
 		for (let j = 0; j < results.length; j++) {
 			const getEach = results[j];
-			results2.push(filterOneWayResult(getEach));
+			//console.log(getEach)
+			results2.push(OneWayFilterItems(getEach));
 		}
 
-		// const FileSystem = require("fs");
-		// FileSystem.writeFile('test_pruned.json', JSON.stringify(results2), (error) => {
-		// 	 if (error) throw error;
+		results2.sort(function(a, b) {
+			return a.price - b.price;
+		});
+
+		// FileSystem.writeFile('result_test.json', JSON.stringify(results2), (error) => {
+        //    if (error) throw error;
 		// });
 
 		return results2;
@@ -45,71 +56,88 @@ async function findAllOneWayFlights(origin, dest, date, num_adults) {
 	}
 }
 
-async function randomTest() {
-	dat = await api.oneWaySearch('JFK', 'SAV', '2023-02-22', 1);
-	console.log(dat);
-	results2 = []
-	for (let j = 0; j < dat.length; j++) {
-			const getEach = dat[j];
-			results2.push(filterOneWayResult(getEach));
+/**
+ * Filters the result returned by Duffel to keep only the necessary info
+ * @param {} obj 
+ * @returns 
+ */
+function OneWayFilterItems(obj) {
+	returnObj = {}
+	//returnObj.segments = obj.slices[0].segments
+	returnObj.price = obj.total_amount
+	returnObj.fareType = obj.slices[0].fare_brand_name
+	segmentsArr = []
+	for (let i = 0; i < obj.slices[0].segments.length; i += 1) {
+		currObj = {}
+		currObj.origin = obj.slices[0].segments[i].origin.iata_code
+		currObj.destination = obj.slices[0].segments[i].destination.iata_code
+		currObj.flightNumber = obj.slices[0].segments[i].marketing_carrier_flight_number
+		currObj.carrierCode = obj.slices[0].segments[i].marketing_carrier.iata_code
+		currObj.carrierName = obj.slices[0].segments[i].marketing_carrier.name
+		currObj.departureTime = obj.slices[0].segments[i].departing_at
+		currObj.arrivalTime = obj.slices[0].segments[i].arriving_at
+		currObj.duration = obj.slices[0].segments[i].duration
+		segmentsArr.push(currObj);
 	}
-	const FileSystem = require("fs");
-	FileSystem.writeFile('test_pruned_2.json', JSON.stringify(results2), (error) => {
-		 if (error) throw error;
-	});
+	returnObj.segments = segmentsArr
+	returnObj.totalDuration = obj.slices[0].duration
+	//console.log(jsonData.data.offers[5].slices[0]);
+	//console.log(returnObj)
+	return returnObj;
 }
 
-function filterOneWayResult(currResult) {
-
-	const mergeById = (a1, a2) =>
-    a1.map(itm => ({
-        ...a2.find((item) => (item.segmentId === itm.id) && item),
-        ...itm
-    }));
-
-	resultObject = {}
-	resultObject.duration = currResult.itineraries[0].duration;
-	resultObject.segments = mergeById(currResult.itineraries[0].segments, currResult.travelerPricings[0].fareDetailsBySegment)
-	resultObject.price = currResult.price.total;
-	return resultObject;
-}
-
-duffel.oneWayLookup("PHL", "LAX", "2023-04-04", 2);
-
+/**
+ * Given a list of itineraries, prints all the source and destination pairs in each itinerary
+ * @param {*} data 
+ */
 function printAllSourceDest(data) {
 	for (let i = 0; i < data.length; i++) {
-		const curr = data[i].itineraries[0].segments;
+		const curr = data[i].slices[0].segments;
 		arrList = []
 		for (let j = 0; j < curr.length; j++) {
-			const dep = curr[j].departure.iataCode;
-			const arr = curr[j].arrival.iataCode;
+			const dep = curr[j].origin.iata_code;
+			const arr = curr[j].destination.iata_code;
 			console.log("DEP:", dep);
 			console.log("ARR:", arr);
+			console.log("Flight Number:",curr[j].operating_carrier_flight_number)
+			console.log("Airline:",curr[j].operating_carrier.name)
 		}
+		console.log("Price:",data[i].total_amount)
+		console.log("Fare Type:", data[i].slices[0].fare_brand_name)
 		console.log();
 	}
 }
 
+/**
+ * Given some flight results and a destination, finds all flights that go through the given destination
+ * @param {} dataToFilter 
+ * @param {*} dest 
+ * @returns 
+ */
 function filterJSONResult(dataToFilter, dest) {
-
 	try {
 		var finList = []
 		for (let i = 0; i < dataToFilter.length; i++) {
-			const curr = dataToFilter[i].itineraries[0].segments;
+			const curr = dataToFilter[i].slices[0].segments;
 			var arrList = []
 			for (let j = 0; j < curr.length; j++) {
-				const arr = curr[j].arrival.iataCode;
+				const arr = curr[j].destination.iata_code;
 				arrList.push(arr);
 			}
 			if (arrList.includes(dest)) {
 				finList = finList.concat(dataToFilter[i]);
 			}
+			//console.log(arrList)
 		}
+		printAllSourceDest(finList);
 		return finList;
 	} catch (e) {
 		console.log(e);
 	}
 }
+
+
+
 
 /**
  * Iterates through entire Subscription Table.

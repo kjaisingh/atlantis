@@ -2,6 +2,7 @@
 const express = require('express');
 const routes = require('./routes.js');
 const api = require('./api.js');
+const duffel = require('./duffel_api.js');
 const cacheTable = require('./modified.json');
 var db = require("./database.js");
 const jsonData = require("./test_pruned.json");
@@ -58,8 +59,6 @@ async function randomTest() {
 	});
 }
 
-//randomTest();
-
 function filterOneWayResult(currResult) {
 
 	const mergeById = (a1, a2) =>
@@ -75,8 +74,7 @@ function filterOneWayResult(currResult) {
 	return resultObject;
 }
 
-// findAllOneWayFlights('JFK', 'MIA', '2023-02-22', 1);
-
+duffel.oneWayLookup("PHL", "LAX", "2023-04-04", 2);
 
 function printAllSourceDest(data) {
 	for (let i = 0; i < data.length; i++) {

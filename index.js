@@ -5,7 +5,7 @@ const api = require('./api.js');
 const duffel = require('./duffel_api.js');
 const cacheTable = require('./modified.json');
 var db = require("./database.js");
-//const jsonData = require("./result_test.json");
+const jsonData = require("./duffel_return_test.json");
 
 
 // Express initialization
@@ -38,16 +38,16 @@ async function findAllOneWayFlights(origin, dest, date, num_adults) {
 		for (let j = 0; j < results.length; j++) {
 			const getEach = results[j];
 			//console.log(getEach)
-			results2.push(OneWayFilterItems(getEach));
+			results2.push(OneWayFilterItems(getEach, 0));
 		}
 
 		results2.sort(function(a, b) {
 			return a.price - b.price;
 		});
 
-		// FileSystem.writeFile('result_test.json', JSON.stringify(results2), (error) => {
-        //    if (error) throw error;
-		// });
+		FileSystem.writeFile('result_test.json', JSON.stringify(results2), (error) => {
+           if (error) throw error;
+		});
 
 		return results2;
 	} catch (e) {
@@ -56,31 +56,35 @@ async function findAllOneWayFlights(origin, dest, date, num_adults) {
 	}
 }
 
+findAllOneWayFlights('ORD', 'SFO', '2023-03-29', 1)
+
+// duffel.roundTripLookup('PHL', 'LAX', '2023-04-04', '2023-05-05', 1)
+
 /**
  * Filters the result returned by Duffel to keep only the necessary info
  * @param {} obj 
  * @returns 
  */
-function OneWayFilterItems(obj) {
+function OneWayFilterItems(obj, sliceNum) {
 	returnObj = {}
 	//returnObj.segments = obj.slices[0].segments
 	returnObj.price = obj.total_amount
-	returnObj.fareType = obj.slices[0].fare_brand_name
+	returnObj.fareType = obj.slices[sliceNum].fare_brand_name
 	segmentsArr = []
-	for (let i = 0; i < obj.slices[0].segments.length; i += 1) {
+	for (let i = 0; i < obj.slices[sliceNum].segments.length; i += 1) {
 		currObj = {}
-		currObj.origin = obj.slices[0].segments[i].origin.iata_code
-		currObj.destination = obj.slices[0].segments[i].destination.iata_code
-		currObj.flightNumber = obj.slices[0].segments[i].marketing_carrier_flight_number
-		currObj.carrierCode = obj.slices[0].segments[i].marketing_carrier.iata_code
-		currObj.carrierName = obj.slices[0].segments[i].marketing_carrier.name
-		currObj.departureTime = obj.slices[0].segments[i].departing_at
-		currObj.arrivalTime = obj.slices[0].segments[i].arriving_at
-		currObj.duration = obj.slices[0].segments[i].duration
+		currObj.origin = obj.slices[sliceNum].segments[i].origin.iata_code
+		currObj.destination = obj.slices[sliceNum].segments[i].destination.iata_code
+		currObj.flightNumber = obj.slices[sliceNum].segments[i].marketing_carrier_flight_number
+		currObj.carrierCode = obj.slices[sliceNum].segments[i].marketing_carrier.iata_code
+		currObj.carrierName = obj.slices[sliceNum].segments[i].marketing_carrier.name
+		currObj.departureTime = obj.slices[sliceNum].segments[i].departing_at
+		currObj.arrivalTime = obj.slices[sliceNum].segments[i].arriving_at
+		currObj.duration = obj.slices[sliceNum].segments[i].duration
 		segmentsArr.push(currObj);
 	}
 	returnObj.segments = segmentsArr
-	returnObj.totalDuration = obj.slices[0].duration
+	returnObj.totalDuration = obj.slices[sliceNum].duration
 	//console.log(jsonData.data.offers[5].slices[0]);
 	//console.log(returnObj)
 	return returnObj;
@@ -129,7 +133,7 @@ function filterJSONResult(dataToFilter, dest) {
 			}
 			//console.log(arrList)
 		}
-		printAllSourceDest(finList);
+		//printAllSourceDest(finList);
 		return finList;
 	} catch (e) {
 		console.log(e);
@@ -137,6 +141,29 @@ function filterJSONResult(dataToFilter, dest) {
 }
 
 
+async function findDirectReturnFlights(origin, dest, departure_date, return_date, passengers) {
+	results = await duffel.roundTripLookup(origin, dest, departure_date, return_date, passengers)
+	offerList = results.offers
+	retList = []
+	for (let i = 0; i < offerList.length; i += 1) {
+		currOffer = offerList[i]
+		currFilteredOffer = []
+		for (let j = 0; j < currOffer.slices.length; j += 1) {
+			currObj = OneWayFilterItems(currOffer, j)
+			currFilteredOffer.push(currObj)
+		}
+		retList.push(currFilteredOffer)
+	}
+	// const FileSystem = require("fs");
+	// FileSystem.writeFile('two_way_filtered.json', JSON.stringify(retList), (error) => {
+    //     if (error) throw error;
+	// });
+	return retList
+}
+
+//findAllReturnFlights('PHL', 'LAX', '2023-04-04', '2023-05-05', 1)
+
+// console.log(jsonData.data.offers[0].slices.length)
 
 
 /**

@@ -61,7 +61,7 @@ async function findAllOneWayFlights(origin, dest, date, num_adults) {
 	}
 }
 
-findAllOneWayFlights('DTW', 'JFK', '2023-04-04', 1)
+// findAllOneWayFlights('DTW', 'JFK', '2023-04-04', 1)
 
 // duffel.roundTripLookup('PHL', 'LAX', '2023-04-04', '2023-05-05', 1)
 

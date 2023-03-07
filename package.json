@@ -17,6 +17,7 @@
   },
   "homepage": "https://github.com/aakashjajoo1/atlantis#readme",
   "dependencies": {
+    "@duffel/api": "^1.25.0",
     "amadeus": "^7.1.0",
     "aws-sdk": "^2.1313.0",
     "axios": "^1.3.4",

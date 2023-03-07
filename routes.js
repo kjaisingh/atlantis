@@ -1,5 +1,6 @@
 // Imports
 var db = require("./database.js");
+var duffle = require("./duffel_api");
 var fs = require("fs");
 
 // Routes
@@ -32,7 +33,14 @@ var getHome = function (req, res) {
 
 // GET /search - searches for a given flight
 var getSearch = function (req, res) {
+	var origin = res.body.origin;
+	var dest = res.body.dest;
+	var data = res.body.date;
+	var num_adults = res.body.num_adults;
 
+	results = duffle.findAllOneWayFlights(origin, dest, data, num_adults);
+
+	res.send(JSON.stringify(results));
 }
 
 // POST /subscribe - creates a subscription
@@ -48,7 +56,7 @@ var postSubscribe = function (req, res) {
 		if (err) {
 			res.redirect("/home")
 		} else {
-			res.send({success: true})
+			res.send({ success: true })
 		}
 	})
 }

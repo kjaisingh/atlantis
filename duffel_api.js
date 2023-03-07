@@ -57,10 +57,10 @@ async function oneWayLookup(origin, dest, departure_date, passengers) {
 
     try {
       const response = await axios(config);
-      const FileSystem = require("fs");
-      FileSystem.writeFile('duffel_test_4.json', JSON.stringify(response.data), (error) => {
-           if (error) throw error;
-      });
+      // const FileSystem = require("fs");
+      // FileSystem.writeFile('duffel_test_4.json', JSON.stringify(response.data), (error) => {
+      //      if (error) throw error;
+      // });
       return response.data.data;
     } catch (err) {
       return err;
@@ -71,7 +71,7 @@ async function oneWayLookup(origin, dest, departure_date, passengers) {
 
 async function roundTripLookup(origin, dest, departure_date, return_date, passengers) {
 
-  console.log("Searching for flights from", origin, "to", dest);
+  console.log("Searching for flights from", origin, "to", dest, "and back");
   oneAdult = {
       "type": "adult"
     }
@@ -83,7 +83,8 @@ async function roundTripLookup(origin, dest, departure_date, return_date, passen
               "origin": origin,
               "destination": dest,
               "departure_date": departure_date,
-            }, {
+            }, 
+            {
               "origin": dest,
               "destination": origin,
               "departure_date": return_date

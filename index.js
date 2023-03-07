@@ -5,8 +5,13 @@ const api = require('./api.js');
 const duffel = require('./duffel_api.js');
 const cacheTable = require('./modified.json');
 var db = require("./database.js");
-const jsonData = require("./duffel_return_test.json");
-
+const jsonData = require("./duffel_test_2.json");
+const jsonData2 = require("./duffel_test_3.json");
+const jsonData3 = require("./two_way_filtered.json");
+const jsonData4 = require("./cross_product_filtered_2.json");
+//const jsonData5 = require("./all_rt_results.json");
+const jsonData6= require("./cross_product_filtered_2.json");
+const lodash = require('lodash')
 
 // Express initialization
 const app = express();
@@ -45,7 +50,7 @@ async function findAllOneWayFlights(origin, dest, date, num_adults) {
 			return a.price - b.price;
 		});
 
-		FileSystem.writeFile('result_test.json', JSON.stringify(results2), (error) => {
+		FileSystem.writeFile('duffel_test_fin.json', JSON.stringify(results2), (error) => {
            if (error) throw error;
 		});
 
@@ -56,7 +61,7 @@ async function findAllOneWayFlights(origin, dest, date, num_adults) {
 	}
 }
 
-findAllOneWayFlights('ORD', 'SFO', '2023-03-29', 1)
+findAllOneWayFlights('DTW', 'JFK', '2023-04-04', 1)
 
 // duffel.roundTripLookup('PHL', 'LAX', '2023-04-04', '2023-05-05', 1)
 
@@ -154,16 +159,111 @@ async function findDirectReturnFlights(origin, dest, departure_date, return_date
 		}
 		retList.push(currFilteredOffer)
 	}
-	// const FileSystem = require("fs");
-	// FileSystem.writeFile('two_way_filtered.json', JSON.stringify(retList), (error) => {
-    //     if (error) throw error;
-	// });
+
+	var a = await makeDirectRoundTripConsistent(retList)
+	const FileSystem = require("fs");
+	FileSystem.writeFile('two_way_filtered_2.json', JSON.stringify(a), (error) => {
+	     if (error) throw error;
+	});
+	return a
+}
+
+// findDirectReturnFlights('CVG', 'EWR', '2023-04-04', '2023-05-05', 1)
+
+async function makeDirectRoundTripConsistent(data) {
+	retList = []
+	for (let i = 0; i < data.length; i += 1) {
+		curr = data[i]
+		currList = []
+		currList.push({'price': curr[0].price})
+		outboundObj = {}
+		inboundObj = {}
+		outboundObj.segments = curr[0].segments
+		inboundObj.segments = curr[1].segments
+		currList.push(outboundObj)
+		currList.push(inboundObj)
+		retList.push(currList)
+	}
 	return retList
 }
 
+async function crossProductRoundTrip(origin, dest, departure_date, return_date, passengers) {
+
+	var result1 = await findAllOneWayFlights(origin, dest, departure_date, passengers)
+	var result2 = await findAllOneWayFlights(dest, origin, return_date, passengers)
+
+	retList = []
+	for (let i = 0; i < Math.min(result1.length, 25); i += 1) {
+		for (let j = 0; j < Math.min(result2.length, 25); j += 1) {
+			curr1 = result1[i]
+			curr2 = result2[j]
+			//console.log(curr1)
+			totPrice = parseFloat(curr1.price) + parseFloat(curr2.price)
+			totPrice = totPrice.toFixed(2);
+			currList = []
+			outboundObj = {}
+			inboundObj = {}
+			outboundObj.segments = curr1.segments
+			inboundObj.segments = curr2.segments
+			currList.push({'price': totPrice})
+			currList.push(outboundObj)
+			currList.push(inboundObj)
+			retList.push(currList)
+		}
+	}
+
+	retList.sort(function(a, b) {
+		return a[0].price - b[0].price;
+	});
+
+	return retList
+
+	// const FileSystem = require("fs");
+	// FileSystem.writeFile('cross_product_filtered_2.json', JSON.stringify(retList), (error) => {
+    //     if (error) throw error;
+	// });
+}
+
+async function findAllRoundTripFlights(origin, dest, departure_date, return_date, passengers) {
+
+	var direct = await findDirectReturnFlights(origin, dest, departure_date, return_date, passengers)
+	var separate = await crossProductRoundTrip(origin, dest, departure_date, return_date, passengers)
+
+	combined = []
+	combined = combined.concat(direct)
+	combined = combined.concat(separate)
+
+	combined.sort(function (a, b) {
+		return a[0].price - b[0].price
+	})
+
+
+	var uniqueElements = removeDuplicates(combined)
+
+	// console.log("Writing to File")
+	// const FileSystem = require("fs");
+	// FileSystem.writeFile('all_rt_results.json', JSON.stringify(uniqueElements), (error) => {
+    //     if (error) throw error;
+	// });
+
+	return uniqueElements;
+
+}
+
+// findAllRoundTripFlights('JFK', 'SFO', '2023-04-04', '2023-05-05', 1)
+
+function removeDuplicates(array) {
+	return array.filter((item, index, arr) =>
+	  arr.findIndex((t) => lodash.isEqual(t, item)) === index
+	);
+}
+
+
+// crossProductRoundTrip('CVG', 'LAS', '2023-04-28', '2023-05-10', 1)
 //findAllReturnFlights('PHL', 'LAX', '2023-04-04', '2023-05-05', 1)
 
-// console.log(jsonData.data.offers[0].slices.length)
+// console.log(jsonData5.slice(0, 3), removeDuplicates(jsonData5.slice(0, 3)))
+// console.log(lodash.isEqual(jsonData5[0], jsonData5[2]))
 
 
 /**

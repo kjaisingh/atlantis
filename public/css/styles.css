@@ -37,6 +37,12 @@
 
 
 /* Booking Form */
+.button-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
 .wrapper {
   max-width: 800px;
   margin: 50px auto;

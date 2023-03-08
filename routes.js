@@ -2,45 +2,61 @@
 var db = require("./database.js");
 var duffle = require("./duffel_api");
 var fs = require("fs");
+var bodyParser = require('body-parser');
+
+// Initialize static data
+var airports = fs.readFileSync("views/table-data.txt").toString('utf-8').split("\n");
 
 // Routes
 // GET / - displays home page
 var getHome = function (req, res) {
-	var flights = [
-		{
-			"airline": "American Airlines",
-			"path": "SFO --> PHL --> NYC",
-			"duration": "6 hours 15 mins",
-			"price": "$376",
-		},
-		{
-			"airline": "United Airlines",
-			"path": "SFO --> STL --> NYC",
-			"duration": "6 hours 42 mins",
-			"price": "$315",
-		},
-		{
-			"airline": "Frontier Airlines",
-			"path": "SFO --> NYC",
-			"duration": "6 hours 2 mins",
-			"price": "$502",
-		},
-	];
+	var flights;
 
-	var airports = fs.readFileSync("views/table-data.txt").toString('utf-8').split("\n");
+	if (req.session.data) {
+		var orig = req.session.orig;
+		var dest = req.session.dest;
+		var dep_date = req.session.dep_date;
+		var ret_date = req.session.ret_date;
+		var num_adults = req.session.num_adults;
+		flights = duffle.findAllOneWayFlights(orig, dest, dep_date, num_adults);
+	} else {
+		flights = [
+			{
+				"airline": "American Airlines",
+				"path": "SFO --> PHL --> NYC",
+				"duration": "6 hours 15 mins",
+				"price": "$376",
+			},
+			{
+				"airline": "United Airlines",
+				"path": "SFO --> STL --> NYC",
+				"duration": "6 hours 42 mins",
+				"price": "$315",
+			},
+			{
+				"airline": "Frontier Airlines",
+				"path": "SFO --> NYC",
+				"duration": "6 hours 2 mins",
+				"price": "$502",
+			},
+		];
+	}
+
 	res.render("home.ejs", { data: flights, options: airports });
 };
 
-// GET /search - searches for a given flight
-var getSearch = function (req, res) {
-	var origin = res.body.origin;
-	var dest = res.body.dest;
-	var data = res.body.date;
-	var num_adults = res.body.num_adults;
+// POST /search - searches for a given flight
+var postSearch = function (req, res) {
+	const obj = JSON.parse(JSON.stringify(req.body));
+	req.session.data = true;
 
-	results = duffle.findAllOneWayFlights(origin, dest, data, num_adults);
+	req.session.orig = obj.orig;
+	req.session.dest = obj.dest;
+	req.session.dep_date = obj.dep_date;
+	req.session.ret_date = obj.ret_date;
+	req.session.num_adults = obj.num_adults;
 
-	res.send(JSON.stringify(results));
+	res.redirect("/");
 }
 
 // POST /subscribe - creates a subscription
@@ -64,7 +80,7 @@ var postSubscribe = function (req, res) {
 // Exports
 var routes = {
 	get_home: getHome,
-	get_search: getSearch,
+	post_search: postSearch,
 	post_subscribe: postSubscribe,
 };
 module.exports = routes;

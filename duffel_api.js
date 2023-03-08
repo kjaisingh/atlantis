@@ -193,8 +193,8 @@ async function findAllOneWayFlights(origin, dest, date, num_adults) {
 
 /**
  * Filters the result returned by Duffel to keep only the necessary info
- * @param {} obj 
- * @returns 
+ * @param {} obj
+ * @returns
  */
 function OneWayFilterItems(obj, sliceNum) {
   returnObj = {}
@@ -223,7 +223,7 @@ function OneWayFilterItems(obj, sliceNum) {
 
 /**
  * Given a list of itineraries, prints all the source and destination pairs in each itinerary
- * @param {*} data 
+ * @param {*} data
  */
 function printAllSourceDest(data) {
   for (let i = 0; i < data.length; i++) {
@@ -245,9 +245,9 @@ function printAllSourceDest(data) {
 
 /**
  * Given some flight results and a destination, finds all flights that go through the given destination
- * @param {} dataToFilter 
- * @param {*} dest 
- * @returns 
+ * @param {} dataToFilter
+ * @param {*} dest
+ * @returns
  */
 function filterJSONResult(dataToFilter, dest) {
   try {

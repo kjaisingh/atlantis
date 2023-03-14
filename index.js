@@ -9,7 +9,7 @@ const routes = require('./routes.js');
 const api = require('./api.js');
 const duffel = require('./duffel_api.js');
 var db = require("./database.js");
-// const jsonData = require("./duffel_test_2.json");
+const jsonData = require("./duffel_test_3.json");
 // const jsonData2 = require("./duffel_test_3.json");
 // const jsonData3 = require("./two_way_filtered.json");
 // const jsonData4 = require("./cross_product_filtered_2.json");
@@ -60,6 +60,28 @@ function asyncSubscribeJob() {
 			}
 		})
 	})
+}
+
+function filterData(data) {
+	retList = []
+	for (let i = 0; i < data.length; i += 1) {
+		currSegs = data[i].segments
+		currObj = {}
+		currObj.airline = currSegs[0].carrierName
+		path = currSegs[0].origin
+		for (let j = 0; j < currSegs.length; j += 1) {
+			nextDest = " -> ".concat(currSegs[j].destination)
+			path = path.concat(nextDest)
+		}
+		currObj.path = path
+		currObj.price = data[i].price
+		currObj.duration = data[i].totalDuration
+		retList.push(currObj)
+	}
+	const FileSystem = require("fs");
+    FileSystem.writeFile('filtered_test.json', JSON.stringify(retList), (error) => {
+         if (error) throw error;
+    });
 }
 
 // Routes initialization

@@ -10,19 +10,26 @@ var airports = fs.readFileSync("views/table-data.txt").toString('utf-8').split("
 // Routes
 // GET / - displays home page
 var getHome = async function (req, res) {
-	var flights;
+	var flights = []
 
 	if (req.session.data) {
 		var orig = req.session.orig;
 		var dest = req.session.dest;
 		var dep_date = req.session.dep_date;
 		var ret_date = req.session.ret_date;
+		console.log(dep_date)
+		console.log(ret_date)
 		var num_adults = req.session.num_adults;
 		if (ret_date) {
-			flights = await duffle.findAllOneWayFlights(orig, dest, dep_date, num_adults);
+			var toPush = await duffle.findAllOneWayFlights(orig, dest, dep_date, num_adults);
+			console.log(toPush[0])
+			flights.push(filterData(toPush))
+			flights.push([])
 		} else {
-			flights[0] = await duffle.findAllRoundTripFlights(orig, dest, dep_date, ret_date, num_adults);
-			flights[1] = [];
+			var toPush1 = await duffle.findAllOneWayFlights(orig, dest, dep_date, num_adults);
+			var toPush2 = await duffle.findAllOneWayFlights(dest, orig, ret_date, num_adults);
+			flights.push(filterData(toPush1))
+			flights.push(filterData(toPush2))
 		}
 	} else {
 		flights = [
@@ -71,6 +78,25 @@ var getHome = async function (req, res) {
 
 	res.render("home.ejs", { data: flights, options: airports });
 };
+
+function filterData(data) {
+	retList = []
+	for (let i = 0; i < data.length; i += 1) {
+		currSegs = data[i].segments
+		currObj = {}
+		currObj.airline = currSegs[0].carrierName
+		path = currSegs[0].origin
+		for (let j = 0; j < currSegs.length; j += 1) {
+			nextDest = " -> ".concat(currSegs[j].destination)
+			path = path.concat(nextDest)
+		}
+		currObj.path = path
+		currObj.price = data[i].price
+		currObj.duration = data[i].totalDuration
+		retList.push(currObj)
+	}
+	return retList
+}
 
 // POST /search - searches for a given flight
 var postSearch = function (req, res) {

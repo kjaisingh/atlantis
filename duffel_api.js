@@ -150,15 +150,18 @@ async function findAllOneWayFlights(origin, dest, date, num_adults) {
       return entry.X === origin && entry.Y == dest;
     });
 
-    const zArrayFromRow = requisiteRow[0].Z;
     var results = []
     const directSearch = await oneWayLookup(origin, dest, date, num_adults);
     //console.log("Direct:", directSearch)
     results = results.concat(directSearch.offers);
-    for (let i = 0; i < zArrayFromRow.length; i++) {
-      const res = await oneWayLookup(origin, zArrayFromRow[i], date, num_adults);
-      const filtered = filterJSONResult(res.offers, dest)
-      results = results.concat(filtered);
+
+    if (requisiteRow.length > 0) {
+      const zArrayFromRow = requisiteRow[0].Z;
+      for (let i = 0; i < zArrayFromRow.length; i++) {
+        const res = await oneWayLookup(origin, zArrayFromRow[i], date, num_adults);
+        const filtered = filterJSONResult(res.offers, dest)
+        results = results.concat(filtered);
+      }
     }
 
     const FileSystem = require("fs");

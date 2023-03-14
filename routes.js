@@ -105,9 +105,7 @@ var postSearch = function (req, res) {
 	req.session.dep_date = obj.dep_date;
 	req.session.ret_date = obj.ret_date;
 	req.session.num_adults = obj.num_adults;
-
 	console.log(obj.ret_date);
-
 	res.redirect("/");
 }
 

@@ -17,12 +17,9 @@ var getHome = async function (req, res) {
 		var dest = req.session.dest;
 		var dep_date = req.session.dep_date;
 		var ret_date = req.session.ret_date;
-		console.log(dep_date)
-		console.log(ret_date)
 		var num_adults = req.session.num_adults;
-		if (ret_date) {
+		if (!ret_date) {
 			var toPush = await duffle.findAllOneWayFlights(orig, dest, dep_date, num_adults);
-			console.log(toPush[0])
 			flights.push(filterData(toPush))
 			flights.push([])
 		} else {

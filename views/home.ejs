@@ -137,6 +137,8 @@
     <!-- Results Table -->
     <section>
       <div class="container px-5">
+		    <!-- Departures -->
+        <h3>Departures</h3>
         <div class="row">
           <div class="col-12">
             <div class="card">
@@ -161,7 +163,7 @@
                     </tr>
                   </thead>
                   <tbody class="customtable">
-                    <% for (var i=0; i < data.length; i++) { %>
+                    <% for (var i=0; i < data[0].length; i++) { %>
                     <tr>
                       <th>
                         <label class="customcheckbox">
@@ -169,15 +171,62 @@
                           <span class="checkmark"></span>
                         </label>
                       </th>
-                      <td><%= data[i].airline %></td>
-                      <td><%= data[i].path %></td>
-                      <td><%= data[i].duration %></td>
-                      <td><%= data[i].price %></td>
+                      <td><%= data[0][i].airline %></td>
+                      <td><%= data[0][i].path %></td>
+                      <td><%= data[0][i].duration %></td>
+                      <td><%= data[0][i].price %></td>
                     </tr>
                     <% } %>
                   </tbody>
                 </table>
               </div>
+            </div>
+          </div>
+        </div>
+
+		    <!-- Returns -->
+        <h3>Returns</h3>
+        <div class="row">
+          <div class="col-12">
+            <div class="card">
+            <div class="table-responsive">
+              <table class="table">
+              <thead class="thead-light">
+                <tr>
+                <th>
+                  <label class="customcheckbox m-b-20">
+                  <input
+                    type="checkbox"
+                    id="mainCheckbox"
+                    style="opacity: 0"
+                  />
+                  <span class="checkmark"></span>
+                  </label>
+                </th>
+                <th scope="col">Airline</th>
+                <th scope="col">Path</th>
+                <th scope="col">Duration</th>
+                <th scope="col">Price</th>
+                </tr>
+              </thead>
+              <tbody class="customtable">
+                <% for (var i=0; i < data[1].length; i++) { %>
+                <tr>
+                <th>
+                  <label class="customcheckbox">
+                  <input type="checkbox" class="listCheckbox" />
+                  <span class="checkmark"></span>
+                  </label>
+                </th>
+                <td><%= data[1][i].airline %></td>
+                <td><%= data[1][i].path %></td>
+                <td><%= data[1][i].duration %></td>
+                <td><%= data[1][i].price %></td>
+                </tr>
+                <% } %>
+              </tbody>
+              </table>
+            </div>
             </div>
           </div>
         </div>

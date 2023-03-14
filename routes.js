@@ -9,7 +9,7 @@ var airports = fs.readFileSync("views/table-data.txt").toString('utf-8').split("
 
 // Routes
 // GET / - displays home page
-var getHome = function (req, res) {
+var getHome = async function (req, res) {
 	var flights;
 
 	if (req.session.data) {
@@ -18,27 +18,54 @@ var getHome = function (req, res) {
 		var dep_date = req.session.dep_date;
 		var ret_date = req.session.ret_date;
 		var num_adults = req.session.num_adults;
-		flights = duffle.findAllOneWayFlights(orig, dest, dep_date, num_adults);
+		if (ret_date) {
+			flights[0] = await duffle.findAllRoundTripFlights(orig, dest, dep_date, ret_date, num_adults);
+			flights[1] = [];
+		} else {
+			flights = await duffle.findAllOneWayFlights(orig, dest, dep_date, num_adults);
+		}
 	} else {
 		flights = [
-			{
-				"airline": "American Airlines",
-				"path": "SFO --> PHL --> NYC",
-				"duration": "6 hours 15 mins",
-				"price": "$376",
-			},
-			{
-				"airline": "United Airlines",
-				"path": "SFO --> STL --> NYC",
-				"duration": "6 hours 42 mins",
-				"price": "$315",
-			},
-			{
-				"airline": "Frontier Airlines",
-				"path": "SFO --> NYC",
-				"duration": "6 hours 2 mins",
-				"price": "$502",
-			},
+			[
+				{
+					"airline": "American Airlines",
+					"path": "SFO --> PHL --> NYC",
+					"duration": "6 hours 15 mins",
+					"price": "$376",
+				},
+				{
+					"airline": "United Airlines",
+					"path": "SFO --> STL --> NYC",
+					"duration": "6 hours 42 mins",
+					"price": "$315",
+				},
+				{
+					"airline": "Frontier Airlines",
+					"path": "SFO --> NYC",
+					"duration": "6 hours 2 mins",
+					"price": "$502",
+				},
+			],
+			[
+				{
+					"airline": "Singapore Airlines",
+					"path": "SFO --> PHL --> NYC",
+					"duration": "6 hours 15 mins",
+					"price": "$376",
+				},
+				{
+					"airline": "Delta Airlines",
+					"path": "SFO --> STL --> NYC",
+					"duration": "6 hours 42 mins",
+					"price": "$315",
+				},
+				{
+					"airline": "Sprint Airways",
+					"path": "SFO --> NYC",
+					"duration": "6 hours 2 mins",
+					"price": "$502",
+				},
+			]
 		];
 	}
 
@@ -55,6 +82,8 @@ var postSearch = function (req, res) {
 	req.session.dep_date = obj.dep_date;
 	req.session.ret_date = obj.ret_date;
 	req.session.num_adults = obj.num_adults;
+
+	console.log(obj.ret_date);
 
 	res.redirect("/");
 }

@@ -19,10 +19,10 @@ var getHome = async function (req, res) {
 		var ret_date = req.session.ret_date;
 		var num_adults = req.session.num_adults;
 		if (ret_date) {
+			flights = await duffle.findAllOneWayFlights(orig, dest, dep_date, num_adults);
+		} else {
 			flights[0] = await duffle.findAllRoundTripFlights(orig, dest, dep_date, ret_date, num_adults);
 			flights[1] = [];
-		} else {
-			flights = await duffle.findAllOneWayFlights(orig, dest, dep_date, num_adults);
 		}
 	} else {
 		flights = [
@@ -49,19 +49,19 @@ var getHome = async function (req, res) {
 			[
 				{
 					"airline": "Singapore Airlines",
-					"path": "SFO --> PHL --> NYC",
+					"path": "NYC --> PHL --> SFO",
 					"duration": "6 hours 15 mins",
 					"price": "$376",
 				},
 				{
 					"airline": "Delta Airlines",
-					"path": "SFO --> STL --> NYC",
+					"path": "NYC --> STL --> SFO",
 					"duration": "6 hours 42 mins",
 					"price": "$315",
 				},
 				{
 					"airline": "Sprint Airways",
-					"path": "SFO --> NYC",
+					"path": "NYC --> SFO",
 					"duration": "6 hours 2 mins",
 					"price": "$502",
 				},

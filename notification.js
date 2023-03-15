@@ -1,6 +1,6 @@
 // Import modules
 const duffel = require('./duffel_api.js');
-const api = require('./api.js');
+const twilioClient = require('./twilio-client.js');
 var db = require("./database.js");
 
 /**
@@ -9,7 +9,7 @@ var db = require("./database.js");
  * Otherwise, it finds the cheapest flight for the given subscription.
  * If the price is cheaper than the given threshold, a Twilio text notification is sent and the subscription is deleted.
  */
-function asyncSubscribeJob() {
+function handleSubscriptions() {
     console.log('Starting subscription job');
     db.getAllSubscriptions(function (err, data) {
         data.Items.forEach(entry => {
@@ -23,7 +23,7 @@ function asyncSubscribeJob() {
                 notif += `Unfortunately, the price of your desired trip for ${split[2]} travelers from ${split[0]} to ${split[1]} departing on ${split[3]} never fell below your threshold of $${entry.price_threshold.N}.\n\n`;
                 notif += `Thanks for being an Atlantis customer!`;
 
-                api.sendTxtNotif(notif, entry.mobile_number.S);
+                twilioClient.sendTextNotification(notif, entry.mobile_number.S);
                 db.deleteSubscription(entry.itinerary.S, entry.mobile_number.S);
             } else if (!return_date) {
                 duffel.findAllOneWayFlights(split[0], split[1], split[3], split[2]).then(results => {
@@ -39,7 +39,7 @@ function asyncSubscribeJob() {
                         }
                         notif += `Thanks for being an Atlantis customer!`;
 
-                        api.sendTxtNotif(notif, entry.mobile_number.S);
+                        twilioClient.sendTextNotification(notif, entry.mobile_number.S);
                         db.deleteSubscription(entry.itinerary.S, entry.mobile_number.S);
                     }
                 })
@@ -62,7 +62,7 @@ function asyncSubscribeJob() {
                             notif += `The returning flight is operated by ${filtered_return_results[0].airline} and follows this path: ${filtered_return_results[0].path}\n\n`;
                             notif += `Thanks for being an Atlantis customer!`;
 
-                            api.sendTxtNotif(notif, entry.mobile_number.S);
+                            twilioClient.sendTextNotification(notif, entry.mobile_number.S);
                             db.deleteSubscription(entry.itinerary.S, entry.mobile_number.S);
                         }
                     })
@@ -73,5 +73,5 @@ function asyncSubscribeJob() {
 }
 
 module.exports = {
-    asyncSubscribeJob,
+    handleSubscriptions,
 }

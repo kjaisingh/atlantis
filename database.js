@@ -54,13 +54,16 @@ async function getHiddenCities(source, destination) {
  *
  * @param source: source IATA, eg. "LAX"
  * @param destination: destination IATA, eg. "JFK"
- * @param date: flight date YYYY-MM-DD, eg. "2023-05-31"
+ * @param number_travelers: the number of travelers, eg. 1
+ * @param departure_date: departure date YYYY-MM-DD, eg. "2023-05-31"
+ * @param return_date: return date YYYY-MM-DD, eg. "2023-05-34" (if null, then one-way)
  * @param price_threshold: price threshold under which to be notified, eg. "250"
  * @param name: name of user, eg. "John Doe"
  * @param mobile_number: mobile number of user +1-xxx-xxx-xxxx, eg +1-123-456-7890
  */
-function addSubscription(source, destination, date, price_threshold, name, mobile_number) {
-    const itinerary = source + '+' + destination + '+' + date
+function addSubscription(source, destination, number_travelers, departure_date, return_date, price_threshold, name, mobile_number) {
+    const itinerary = source + '+' + destination + '+' + number_travelers + '+' + departure_date + '+' + (return_date ? return_date : '0');
+
     const params = {
         TableName: SubscriptionTableName,
         Item: {

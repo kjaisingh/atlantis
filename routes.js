@@ -103,12 +103,14 @@ var postSearch = function (req, res) {
 var postSubscribe = function (req, res) {
 	var source = req.body.source;
 	var destination = req.body.destination;
-	var date = req.body.date;
+	var number_travelers = req.body.number_travelers;
+	var departure_date = req.body.departure_date;
+	var return_date = req.body.return_date;
 	var threshold = req.body.threshold;
 	var name = req.body.name;
 	var number = req.body.number;
 
-	db.addSubscription(source, destination, date, threshold, name, number, function (err, data) {
+	db.addSubscription(source, destination, number_travelers, departure_date, return_date, threshold, name, number, function (err, data) {
 		if (err) {
 			res.redirect("/home");
 		} else {

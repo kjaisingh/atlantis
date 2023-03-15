@@ -180,15 +180,36 @@ async function findAllOneWayFlights(origin, dest, date, num_adults) {
       return a.price - b.price;
     });
 
-    FileSystem.writeFile('duffel_test_fin.json', JSON.stringify(results2), (error) => {
-      if (error) throw error;
-    });
+    // FileSystem.writeFile('duffel_test_fin.json', JSON.stringify(results2), (error) => {
+    //   if (error) throw error;
+    // });
 
     return results2;
   } catch (e) {
     console.log(e);
     return e;
   }
+}
+
+// USED IN NOTIFICATION FUNCTION DON'T UNCOMMENT OR DELETE
+// Helper function to filter returned data from API 
+function filterData(data) {
+  retList = []
+  for (let i = 0; i < data.length; i += 1) {
+    currSegs = data[i].segments
+    currObj = {}
+    currObj.airline = currSegs[0].carrierName
+    path = currSegs[0].origin
+    for (let j = 0; j < currSegs.length; j += 1) {
+      nextDest = " → ".concat(currSegs[j].destination)
+      path = path.concat(nextDest)
+    }
+    currObj.path = path
+    currObj.price = data[i].price
+    currObj.duration = data[i].totalDuration
+    retList.push(currObj)
+  }
+  return retList
 }
 
 // findAllOneWayFlights('DTW', 'JFK', '2023-04-04', 1)
@@ -398,6 +419,7 @@ function removeDuplicates(array) {
 module.exports = {
   oneWayLookup,
   roundTripLookup,
+  filterData,
   findAllOneWayFlights,
   findAllRoundTripFlights,
 }

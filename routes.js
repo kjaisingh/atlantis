@@ -39,6 +39,7 @@ var getHome = async function (req, res) {
 		req.session.phone_number = "";
 		req.session.price_threshold = "";
 		flights = [[], []];
+
 		/*
 		flights = [
 			[

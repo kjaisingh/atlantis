@@ -18,6 +18,8 @@ var getHome = async function (req, res) {
 		var dep_date = req.session.dep_date;
 		var ret_date = req.session.ret_date;
 		var num_adults = req.session.num_adults;
+		var phone_number = req.session.phone_number;
+		var price_threshold = req.session.price_threshold;
 		if (!ret_date) {
 			var toPush = await duffle.findAllOneWayFlights(orig, dest, dep_date, num_adults);
 			flights.push(filterData(toPush))
@@ -29,6 +31,15 @@ var getHome = async function (req, res) {
 			flights.push(filterData(toPush2))
 		}
 	} else {
+		req.session.orig = "";
+		req.session.dest = "";
+		req.session.dep_date = "";
+		req.session.ret_date = "";
+		req.session.num_adults = "";
+		req.session.phone_number = "";
+		req.session.price_threshold = "";
+		flights = [[], []];
+		/*
 		flights = [
 			[
 				{
@@ -42,12 +53,6 @@ var getHome = async function (req, res) {
 					"path": "SFO --> STL --> NYC",
 					"duration": "6 hours 42 mins",
 					"price": "$315",
-				},
-				{
-					"airline": "Frontier Airlines",
-					"path": "SFO --> NYC",
-					"duration": "6 hours 2 mins",
-					"price": "$502",
 				},
 			],
 			[
@@ -63,49 +68,33 @@ var getHome = async function (req, res) {
 					"duration": "6 hours 42 mins",
 					"price": "$315",
 				},
-				{
-					"airline": "Sprint Airways",
-					"path": "NYC --> SFO",
-					"duration": "6 hours 2 mins",
-					"price": "$502",
-				},
 			]
 		];
+		*/
 	}
 
-	res.render("home.ejs", { data: flights, options: airports });
+	res.render("home.ejs", {
+		data: flights, options: airports,
+		orig: req.session.orig, dest: req.session.dest,
+		dep_date: req.session.dep_date, ret_date: req.session.ret_date,
+		phone_number: req.session.phone_number, price_threshold: req.session.price_threshold
+	});
 };
-
-function filterData(data) {
-	retList = []
-	for (let i = 0; i < data.length; i += 1) {
-		currSegs = data[i].segments
-		currObj = {}
-		currObj.airline = currSegs[0].carrierName
-		path = currSegs[0].origin
-		for (let j = 0; j < currSegs.length; j += 1) {
-			nextDest = " -> ".concat(currSegs[j].destination)
-			path = path.concat(nextDest)
-		}
-		currObj.path = path
-		currObj.price = data[i].price
-		currObj.duration = data[i].totalDuration
-		retList.push(currObj)
-	}
-	return retList
-}
 
 // POST /search - searches for a given flight
 var postSearch = function (req, res) {
 	const obj = JSON.parse(JSON.stringify(req.body));
 	req.session.data = true;
+	req.session.ret_date = "";
 
 	req.session.orig = obj.orig;
 	req.session.dest = obj.dest;
 	req.session.dep_date = obj.dep_date;
 	req.session.ret_date = obj.ret_date;
 	req.session.num_adults = obj.num_adults;
-	console.log(obj.ret_date);
+	req.session.phone_number = obj.phone_number;
+	req.session.price_threshold = obj.price_threshold;
+
 	res.redirect("/");
 }
 
@@ -120,11 +109,31 @@ var postSubscribe = function (req, res) {
 
 	db.addSubscription(source, destination, date, threshold, name, number, function (err, data) {
 		if (err) {
-			res.redirect("/home")
+			res.redirect("/home");
 		} else {
-			res.send({ success: true })
+			res.send({ success: true });
 		}
-	})
+	});
+}
+
+// Helper function to filter returned data from API
+function filterData(data) {
+	retList = []
+	for (let i = 0; i < data.length; i += 1) {
+		currSegs = data[i].segments
+		currObj = {}
+		currObj.airline = currSegs[0].carrierName
+		path = currSegs[0].origin
+		for (let j = 0; j < currSegs.length; j += 1) {
+			nextDest = " → ".concat(currSegs[j].destination)
+			path = path.concat(nextDest)
+		}
+		currObj.path = path
+		currObj.price = data[i].price
+		currObj.duration = data[i].totalDuration
+		retList.push(currObj)
+	}
+	return retList
 }
 
 // Exports

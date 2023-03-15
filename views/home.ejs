@@ -102,11 +102,25 @@
               </div>
             </div>
             <div
-              class="form-group border-bottom d-flex align-items-center position-relative"
+              class="form-group align-items-center margin d-flex border-bottom position-relative"
             >
               <input type="text" required placeholder="Traveller(s)" class="form-control" name="num_adults"/>
               <div class="label" id="psngr"></div>
               <span class="fas fa-users text-muted"></span>
+            </div>
+            <div
+              class="form-group border-bottom d-flex align-items-center margin position-relative"
+            >
+              <input type="text" required placeholder="Phone Number" class="form-control" name="phone_number"/>
+              <div class="label" id="nmbr"></div>
+              <span class="fas fa-phone text-muted"></span>
+            </div>
+            <div
+              class="form-group border-bottom d-flex align-items-center position-relative"
+            >
+              <input type="text" required placeholder="Price Threshold ($)" class="form-control" name="price_threshold"/>
+              <div class="label" id="prc"></div>
+              <span class="fas fa-dollar text-muted"></span>
             </div>
             <div class="form-group my-3 button-wrapper">
               <input class="btn btn-primary rounded-0 d-flex justify-content-center text-center p-3" type="submit" value="Search Flights">
@@ -117,7 +131,7 @@
     </section>
 
     <!-- Populating Dropdowns -->
-    <script>
+    <script type="text/javascript">
       var options = "<%= options %>".split(",");
       var datalistFrom = document.getElementById("airports-from");
       var datalistTo = document.getElementById("airports-to");
@@ -134,102 +148,105 @@
       });
     </script>
 
+    <!-- Submit Subscription -->
+    <script type="text/javascript">
+      function subRow(n) {
+        if (n.checked) {
+          var row = n.parentNode.parentNode.parentNode;
+          var cols = row.getElementsByTagName("td");
+          var airline = cols[1].textContent;
+          console.log("ADD " + airline);
+          // send POST /susbcription request
+        } else {
+          var row = n.parentNode.parentNode.parentNode;
+          var cols = row.getElementsByTagName("td");
+          var airline = cols[1].textContent;
+          console.log("DELETE " + airline);
+          // send DELETE /susbcription request
+        }
+      }
+    </script>
+
     <!-- Results Table -->
     <section>
       <div class="container px-5">
-		    <!-- Departures -->
-        <h3>Departures</h3>
-        <div class="row">
-          <div class="col-12">
-            <div class="card">
-              <div class="table-responsive">
-                <table class="table">
-                  <thead class="thead-light">
-                    <tr>
-                      <th>
-                        <label class="customcheckbox m-b-20">
-                          <input
-                            type="checkbox"
-                            id="mainCheckbox"
-                            style="opacity: 0"
-                          />
-                          <span class="checkmark"></span>
-                        </label>
-                      </th>
-                      <th scope="col">Airline</th>
-                      <th scope="col">Path</th>
-                      <th scope="col">Duration</th>
-                      <th scope="col">Price</th>
-                    </tr>
-                  </thead>
-                  <tbody class="customtable">
-                    <% for (var i=0; i < data[0].length; i++) { %>
-                    <tr>
-                      <th>
-                        <label class="customcheckbox">
-                          <input type="checkbox" class="listCheckbox" />
-                          <span class="checkmark"></span>
-                        </label>
-                      </th>
-                      <td><%= data[0][i].airline %></td>
-                      <td><%= data[0][i].path %></td>
-                      <td><%= data[0][i].duration %></td>
-                      <td><%= data[0][i].price %></td>
-                    </tr>
-                    <% } %>
-                  </tbody>
-                </table>
+      <!-- Departures -->
+        <% if(data[0].length > 0){ %>
+          <h3>Departures to <%= dest %> on <%= dep_date %></h3>
+          <div class="row">
+            <div class="col-12">
+              <div class="card">
+                <div class="table-responsive">
+                  <table class="table">
+                    <thead class="thead-light">
+                      <tr>
+                        <th scope="col">Subscribe</th>
+                        <th scope="col">Airline</th>
+                        <th scope="col">Path</th>
+                        <th scope="col">Duration</th>
+                        <th scope="col">Price</th>
+                      </tr>
+                    </thead>
+                    <tbody class="customtable">
+                      <% for (var i=0; i < data[0].length; i++) { %>
+                      <tr>
+                        <td>
+                          <label class="customcheckbox">
+                            <input type="checkbox" class="listCheckbox" onclick="subRow(this)" />
+                            <span class="checkmark"></span>
+                          </label>
+                        </td>
+                        <td><%= data[0][i].airline %></td>
+                        <td><%= data[0][i].path %></td>
+                        <td><%= data[0][i].duration %></td>
+                        <td><%= data[0][i].price %></td>
+                      </tr>
+                      <% } %>
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        <% } %>
 
-		    <!-- Returns -->
-        <h3>Returns</h3>
-        <div class="row">
-          <div class="col-12">
-            <div class="card">
-            <div class="table-responsive">
-              <table class="table">
-              <thead class="thead-light">
-                <tr>
-                <th>
-                  <label class="customcheckbox m-b-20">
-                  <input
-                    type="checkbox"
-                    id="mainCheckbox"
-                    style="opacity: 0"
-                  />
-                  <span class="checkmark"></span>
-                  </label>
-                </th>
-                <th scope="col">Airline</th>
-                <th scope="col">Path</th>
-                <th scope="col">Duration</th>
-                <th scope="col">Price</th>
-                </tr>
-              </thead>
-              <tbody class="customtable">
-                <% for (var i=0; i < data[1].length; i++) { %>
-                <tr>
-                <th>
+        <!-- Returns -->
+        <% if(data[1].length > 0){ %>
+          <h3>Returns to <%= orig %> on <%= ret_date %></h3>
+          <div class="row">
+            <div class="col-12">
+              <div class="card">
+              <div class="table-responsive">
+                <table class="table">
+                <thead class="thead-light">
+                  <tr>
+                    <th scope="col">Subscribe</th>
+                    <th scope="col">Airline</th>
+                    <th scope="col">Path</th>
+                    <th scope="col">Duration</th>
+                    <th scope="col">Price</th>
+                  </tr>
+                </thead>
+                <tbody class="customtable">
+                  <% for (var i=0; i < data[1].length; i++) { %>
+                  <tr>
                   <label class="customcheckbox">
-                  <input type="checkbox" class="listCheckbox" />
-                  <span class="checkmark"></span>
+                    <input type="checkbox" class="listCheckbox" onclick="subRow(this)" />
+                    <span class="checkmark"></span>
                   </label>
-                </th>
-                <td><%= data[1][i].airline %></td>
-                <td><%= data[1][i].path %></td>
-                <td><%= data[1][i].duration %></td>
-                <td><%= data[1][i].price %></td>
-                </tr>
-                <% } %>
-              </tbody>
-              </table>
-            </div>
+                  <td><%= data[1][i].airline %></td>
+                  <td><%= data[1][i].path %></td>
+                  <td><%= data[1][i].duration %></td>
+                  <td><%= data[1][i].price %></td>
+                  </tr>
+                  <% } %>
+                </tbody>
+                </table>
+              </div>
+              </div>
             </div>
           </div>
-        </div>
+        <% } %>
       </div>
     </section>
 

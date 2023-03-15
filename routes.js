@@ -1,6 +1,6 @@
 // Imports
 var db = require("./database.js");
-var duffle = require("./duffel_api");
+var duffel = require("./duffel_api");
 var fs = require("fs");
 var bodyParser = require('body-parser');
 
@@ -21,12 +21,12 @@ var getHome = async function (req, res) {
 		var phone_number = req.session.phone_number;
 		var price_threshold = req.session.price_threshold;
 		if (!ret_date) {
-			var toPush = await duffle.findAllOneWayFlights(orig, dest, dep_date, num_adults);
-			flights.push(filterData(toPush))
+			var toPush = await duffel.findAllOneWayFlights(orig, dest, dep_date, num_adults);
+			flights.push(duffel.filterData(toPush))
 			flights.push([])
 		} else {
-			var toPush1 = await duffle.findAllOneWayFlights(orig, dest, dep_date, num_adults);
-			var toPush2 = await duffle.findAllOneWayFlights(dest, orig, ret_date, num_adults);
+			var toPush1 = await duffel.findAllOneWayFlights(orig, dest, dep_date, num_adults);
+			var toPush2 = await duffel.findAllOneWayFlights(dest, orig, ret_date, num_adults);
 			flights.push(filterData(toPush1))
 			flights.push(filterData(toPush2))
 		}
@@ -117,26 +117,6 @@ var postSubscribe = function (req, res) {
 			res.send({ success: true });
 		}
 	});
-}
-
-// Helper function to filter returned data from API
-function filterData(data) {
-	retList = []
-	for (let i = 0; i < data.length; i += 1) {
-		currSegs = data[i].segments
-		currObj = {}
-		currObj.airline = currSegs[0].carrierName
-		path = currSegs[0].origin
-		for (let j = 0; j < currSegs.length; j += 1) {
-			nextDest = " → ".concat(currSegs[j].destination)
-			path = path.concat(nextDest)
-		}
-		currObj.path = path
-		currObj.price = data[i].price
-		currObj.duration = data[i].totalDuration
-		retList.push(currObj)
-	}
-	return retList
 }
 
 // Exports

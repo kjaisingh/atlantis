@@ -191,7 +191,6 @@ async function findAllOneWayFlights(origin, dest, date, num_adults) {
   }
 }
 
-// USED IN NOTIFICATION FUNCTION DON'T UNCOMMENT OR DELETE
 // Helper function to filter returned data from API 
 function filterData(data) {
   retList = []

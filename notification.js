@@ -5,7 +5,7 @@ var db = require("./database.js");
 
 /**
  * Iterates through entire Subscription Table.
- * If a desired flight's date has expired, the subscription is removed from the table.
+ * If a desired flight's departure date has expired, the subscription is removed from the table.
  * Otherwise, it finds the cheapest flight for the given subscription.
  * If the price is cheaper than the given threshold, a Twilio text notification is sent and the subscription is deleted.
  */

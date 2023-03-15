@@ -40,7 +40,7 @@ var getHome = async function (req, res) {
 		req.session.price_threshold = "";
 		flights = [[], []];
 
-		/*
+		// /*
 		flights = [
 			[
 				{
@@ -71,7 +71,7 @@ var getHome = async function (req, res) {
 				},
 			]
 		];
-		*/
+		// */
 	}
 
 	res.render("home.ejs", {

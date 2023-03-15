@@ -151,6 +151,7 @@
 
     <!-- Submit Subscription -->
     <script type="text/javascript">
+      // OPTION 1:
       function subRow(n) {
         if (n.checked) {
           var row = n.parentNode.parentNode.parentNode;
@@ -178,6 +179,26 @@
           console.log("DELETE " + airline);
         }
       }
+
+      // OPTION 2:
+      $(document).ready(function () {
+        $("#ajaxSubmit").click(function () {
+          console.log("CALLED");
+          /*
+          $.ajax({
+            type: "POST",
+            url: "/subscribe",
+            data: {},
+            success: function(result) {
+              console.log("Added subscription.");
+            },
+            error: function(result) {
+              console.log("Error encountered.");
+            }
+          });
+          */
+        });
+      });
     </script>
 
     <!-- Results Table -->
@@ -260,6 +281,12 @@
                 </div>
               </div>
             </div>
+          </div>
+        <% } %>
+
+        <% if (data[0].length > 0 || data[1].length > 0) { %>
+          <div class="form-group my-3 button-wrapper">
+            <input class="btn btn-primary rounded-0 d-flex justify-content-center text-center p-3" id="ajaxSubmit" value="Subscribe">
           </div>
         <% } %>
       </div>

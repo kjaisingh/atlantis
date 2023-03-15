@@ -27,8 +27,8 @@ var getHome = async function (req, res) {
 		} else {
 			var toPush1 = await duffel.findAllOneWayFlights(orig, dest, dep_date, num_adults);
 			var toPush2 = await duffel.findAllOneWayFlights(dest, orig, ret_date, num_adults);
-			flights.push(filterData(toPush1))
-			flights.push(filterData(toPush2))
+			flights.push(duffel.filterData(toPush1))
+			flights.push(duffel.filterData(toPush2))
 		}
 	} else {
 		req.session.orig = "";

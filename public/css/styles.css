@@ -166,6 +166,10 @@ input[type="date"] {
   content: "Traveller(s)";
 }
 
+.wrapper form .label#name::after {
+  content: "Name";
+}
+
 .wrapper form .label#nmbr::after {
   content: "Phone Number";
 }

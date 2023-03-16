@@ -112,6 +112,13 @@
             <div
               class="form-group border-bottom d-flex align-items-center margin position-relative"
             >
+              <input type="text" required placeholder="Name" class="form-control" name="name"/>
+              <div class="label" id="name"></div>
+              <span class="fas fa-person text-muted"></span>
+            </div>
+            <div
+              class="form-group border-bottom d-flex align-items-center margin position-relative"
+            >
               <input type="text" required placeholder="Phone Number" class="form-control" name="phone_number"/>
               <div class="label" id="nmbr"></div>
               <span class="fas fa-phone text-muted"></span>
@@ -151,40 +158,9 @@
 
     <!-- Submit Subscription -->
     <script type="text/javascript">
-      // OPTION 1:
-      function subRow(n) {
-        if (n.checked) {
-          var row = n.parentNode.parentNode.parentNode;
-          var cols = row.getElementsByTagName("td");
-          var airline = cols[1].textContent;
-          /*
-		      $.ajax({
-  	        type: "POST",
-  	        url: "/subscribe",
-  	        data: {
-  	        	// add body data
-  	        },
-  	        success: function(result) {
-  	        	console.log("Added subscription.");
-  	        },
-  	        error: function(result) {
-  	          console.log("Error encountered.");
-  	        }
-  	      });
-          */
-        } else {
-          var row = n.parentNode.parentNode.parentNode;
-          var cols = row.getElementsByTagName("td");
-          var airline = cols[1].textContent;
-          console.log("DELETE " + airline);
-        }
-      }
-
-      // OPTION 2:
       $(document).ready(function () {
         $("#ajaxSubmit").click(function () {
-          console.log("CALLED");
-          /*
+          // /*
           $.ajax({
             type: "POST",
             url: "/subscribe",
@@ -196,7 +172,7 @@
               console.log("Error encountered.");
             }
           });
-          */
+          // */
         });
       });
     </script>
@@ -214,7 +190,6 @@
                   <table class="table">
                     <thead class="thead-light">
                       <tr>
-                        <th scope="col">Subscribe</th>
                         <th scope="col">Airline</th>
                         <th scope="col">Path</th>
                         <th scope="col">Duration</th>
@@ -224,12 +199,6 @@
                     <tbody class="customtable">
                       <% for (var i=0; i < data[0].length; i++) { %>
                       <tr>
-                        <td>
-                          <label class="customcheckbox">
-                            <input type="checkbox" class="listCheckbox" onclick="subRow(this)" />
-                            <span class="checkmark"></span>
-                          </label>
-                        </td>
                         <td><%= data[0][i].airline %></td>
                         <td><%= data[0][i].path %></td>
                         <td><%= data[0][i].duration %></td>
@@ -254,7 +223,6 @@
                   <table class="table">
                     <thead class="thead-light">
                       <tr>
-                        <th scope="col">Subscribe</th>
                         <th scope="col">Airline</th>
                         <th scope="col">Path</th>
                         <th scope="col">Duration</th>
@@ -264,12 +232,6 @@
                     <tbody class="customtable">
                       <% for (var i=0; i < data[1].length; i++) { %>
                       <tr>
-                        <td>
-                          <label class="customcheckbox">
-                            <input type="checkbox" class="listCheckbox" onclick="subRow(this)" />
-                            <span class="checkmark"></span>
-                          </label>
-                        </td>
                         <td><%= data[1][i].airline %></td>
                         <td><%= data[1][i].path %></td>
                         <td><%= data[1][i].duration %></td>

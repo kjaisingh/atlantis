@@ -18,6 +18,7 @@ var getHome = async function (req, res) {
 		var dep_date = req.session.dep_date;
 		var ret_date = req.session.ret_date;
 		var num_adults = req.session.num_adults;
+		var name = req.session.name;
 		var phone_number = req.session.phone_number;
 		var price_threshold = req.session.price_threshold;
 		if (!ret_date) {
@@ -27,8 +28,16 @@ var getHome = async function (req, res) {
 		} else {
 			var toPush1 = await duffel.findAllOneWayFlights(orig, dest, dep_date, num_adults);
 			var toPush2 = await duffel.findAllOneWayFlights(dest, orig, ret_date, num_adults);
-			flights.push(duffel.filterData(toPush1))
-			flights.push(duffel.filterData(toPush2))
+			var filteredPush1 = duffel.filterData(toPush1);
+			var filteredPush2 = duffel.filterData(toPush2);
+			if (filteredPush1.length > 10) {
+				filteredPush1 = filteredPush1.slice(0, 10);
+			}
+			if (filteredPush2.length > 10) {
+				filteredPush2 = filteredPush2.slice(0, 10);
+			}
+			flights.push(filteredPush1);
+			flights.push(filteredPush2);
 		}
 	} else {
 		req.session.orig = "";
@@ -36,11 +45,12 @@ var getHome = async function (req, res) {
 		req.session.dep_date = "";
 		req.session.ret_date = "";
 		req.session.num_adults = "";
+		req.session.name = "";
 		req.session.phone_number = "";
 		req.session.price_threshold = "";
 		flights = [[], []];
 
-		// /*
+		/*
 		flights = [
 			[
 				{
@@ -71,14 +81,15 @@ var getHome = async function (req, res) {
 				},
 			]
 		];
-		// */
+		*/
 	}
 
 	res.render("home.ejs", {
 		data: flights, options: airports,
 		orig: req.session.orig, dest: req.session.dest,
 		dep_date: req.session.dep_date, ret_date: req.session.ret_date,
-		phone_number: req.session.phone_number, price_threshold: req.session.price_threshold
+		name: req.session.name, phone_number: req.session.phone_number,
+		price_threshold: req.session.price_threshold
 	});
 };
 
@@ -93,6 +104,7 @@ var postSearch = function (req, res) {
 	req.session.dep_date = obj.dep_date;
 	req.session.ret_date = obj.ret_date;
 	req.session.num_adults = obj.num_adults;
+	req.session.name = obj.name;
 	req.session.phone_number = obj.phone_number;
 	req.session.price_threshold = obj.price_threshold;
 
@@ -101,14 +113,14 @@ var postSearch = function (req, res) {
 
 // POST /subscribe - creates a subscription
 var postSubscribe = function (req, res) {
-	var source = req.body.source;
-	var destination = req.body.destination;
-	var number_travelers = req.body.number_travelers;
-	var departure_date = req.body.departure_date;
-	var return_date = req.body.return_date;
-	var threshold = req.body.threshold;
-	var name = req.body.name;
-	var number = req.body.number;
+	var source = req.session.orig;
+	var destination = req.session.dest;
+	var number_travelers = req.session.num_adults;
+	var departure_date = req.session.dep_date;
+	var return_date = req.session.ret_date;
+	var threshold = req.session.price_threshold;
+	var name = req.session.name;
+	var number = req.body.phone_number;
 
 	db.addSubscription(source, destination, number_travelers, departure_date, return_date, threshold, name, number, function (err, data) {
 		if (err) {

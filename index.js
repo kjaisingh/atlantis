@@ -26,7 +26,7 @@ app.post('/subscribe', routes.post_subscribe);
 const port = 3000;
 const server = app.listen(port, () => {
 	console.log(`Now listening on port ${port}`);
-	notification.handleSubscriptions();
+	// notification.handleSubscriptions();
 
 	// Comment this in to constantly refresh and notify
 	// setInterval(notification.handleSubscriptions, 60 * 1000) // 60seconds

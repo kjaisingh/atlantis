@@ -120,7 +120,7 @@ var postSubscribe = function (req, res) {
 	var return_date = req.session.ret_date;
 	var threshold = req.session.price_threshold;
 	var name = req.session.name;
-	var number = req.body.phone_number;
+	var number = req.session.phone_number;
 
 	db.addSubscription(source, destination, number_travelers, departure_date, return_date, threshold, name, number, function (err, data) {
 		if (err) {

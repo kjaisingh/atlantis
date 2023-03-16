@@ -41225,8 +41225,9 @@
             "BNA",
             "MEM",
             "IND",
-            "DTW",
-            "CMH"
+            "MSY",
+            "CMH",
+            "LAX"
         ]
     },
     {

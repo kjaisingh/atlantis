@@ -1,5 +1,5 @@
 // Import modules
-const duffel = require('./duffel_api.js');
+const searchClient = require('./search.js');
 const twilioClient = require('./twilio-client.js');
 var db = require("./database.js");
 
@@ -26,9 +26,9 @@ function handleSubscriptions() {
                 twilioClient.sendTextNotification(notif, entry.mobile_number.S);
                 db.deleteSubscription(entry.itinerary.S, entry.mobile_number.S);
             } else if (!return_date) {
-                duffel.findAllOneWayFlights(split[0], split[1], split[3], split[2]).then(results => {
+                searchClient.findAllOneWayFlights(split[0], split[1], split[3], split[2]).then(results => {
                     old_split = entry.itinerary.S.split('+');
-                    filtered_results = duffel.filterData(results);
+                    filtered_results = searchClient.filterData(results);
                     if (filtered_results[0].price < parseFloat(entry.price_threshold.N)) {
                         notif = `Hi ${entry.user.S}!\n\n`;
                         notif += `We found a flight from that is less than your threshold of $${entry.price_threshold.N}!\n\n`;
@@ -44,11 +44,11 @@ function handleSubscriptions() {
                     }
                 })
             } else {
-                duffel.findAllOneWayFlights(split[0], split[1], split[3], split[2]).then(depart_results => {
-                    filtered_depart_results = duffel.filterData(depart_results);
-                    duffel.findAllOneWayFlights(split[1], split[0], split[4], split[2]).then(return_results => {
+                searchClient.findAllOneWayFlights(split[0], split[1], split[3], split[2]).then(depart_results => {
+                    filtered_depart_results = searchClient.filterData(depart_results);
+                    searchClient.findAllOneWayFlights(split[1], split[0], split[4], split[2]).then(return_results => {
                         old_split = entry.itinerary.S.split('+');
-                        filtered_return_results = duffel.filterData(return_results);
+                        filtered_return_results = searchClient.filterData(return_results);
                         total_price = parseFloat(filtered_depart_results[0].price) + parseFloat(filtered_return_results[0].price)
                         if (total_price < parseFloat(entry.price_threshold.N)) {
                             notif = `Hi ${entry.user.S}!\n\n`;
@@ -74,4 +74,4 @@ function handleSubscriptions() {
 
 module.exports = {
     handleSubscriptions,
-}
+};

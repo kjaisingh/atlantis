@@ -6,7 +6,7 @@ const lodash = require('lodash')
 
 // Import modules
 const routes = require('./routes.js');
-const notification = require('./notification.js');
+const notificationClient = require('./notification.js');
 
 // Express initialization
 const app = express();
@@ -26,9 +26,9 @@ app.post('/subscribe', routes.post_subscribe);
 const port = 3000;
 const server = app.listen(port, () => {
 	console.log(`Now listening on port ${port}`);
-	notification.handleSubscriptions();
+	// notificationClient.handleSubscriptions();
 
 	// Comment this in to constantly refresh and notify
-	// setInterval(notification.handleSubscriptions, 60 * 1000) // 60seconds
+	// setInterval(notificationClient.handleSubscriptions, 60 * 1000) // 60seconds
 });
 

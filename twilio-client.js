@@ -1,5 +1,5 @@
 // Imports
-const config = require('./config.json')
+const config = require('./config.json');
 
 // Twilio Connection
 const twilio_client = require("twilio")(config.twilio.accountSid, config.twilio.authToken);
@@ -16,7 +16,7 @@ async function sendTextNotification(body, to) {
       messagingServiceSid: 'MG0467546a68fc987e65a0640dc66aadfb',
       to: to
     })
-    .then(message => console.log(message.sid))
+    .then(message => console.log(message.sid));
 }
 
 // Exports

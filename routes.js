@@ -1,6 +1,6 @@
 // Imports
 var db = require("./database.js");
-var duffel = require("./duffel_api");
+var searchClient = require("./search.js");
 var fs = require("fs");
 var bodyParser = require('body-parser');
 
@@ -8,7 +8,13 @@ var bodyParser = require('body-parser');
 var airports = fs.readFileSync("views/table-data.txt").toString('utf-8').split("\n");
 
 // Routes
-// GET / - displays home page
+
+/**
+ * GET / : displays home page
+ * @param flights: a two dimensional list 
+ * 					where flights[0] contains departing flights in order of increasing price
+ * 					where flights[1] contains returning flights in order of increasing price
+ */
 var getHome = async function (req, res) {
 	var flights = []
 
@@ -22,18 +28,18 @@ var getHome = async function (req, res) {
 		var phone_number = req.session.phone_number;
 		var price_threshold = req.session.price_threshold;
 		if (!ret_date) {
-			var toPush = await duffel.findAllOneWayFlights(orig, dest, dep_date, num_adults);
-			var filteredPush = duffel.filterData(toPush);
+			var toPush = await searchClient.findAllOneWayFlights(orig, dest, dep_date, num_adults);
+			var filteredPush = searchClient.filterData(toPush);
 			if (filteredPush.length > 10) {
 				filteredPush = filteredPush.slice(0, 10);
 			}
 			flights.push(filteredPush);
-			flights.push([]);
+			flights.push([])
 		} else {
-			var toPush1 = await duffel.findAllOneWayFlights(orig, dest, dep_date, num_adults);
-			var toPush2 = await duffel.findAllOneWayFlights(dest, orig, ret_date, num_adults);
-			var filteredPush1 = duffel.filterData(toPush1);
-			var filteredPush2 = duffel.filterData(toPush2);
+			var toPush1 = await searchClient.findAllOneWayFlights(orig, dest, dep_date, num_adults);
+			var toPush2 = await searchClient.findAllOneWayFlights(dest, orig, ret_date, num_adults);
+			var filteredPush1 = searchClient.filterData(toPush1);
+			var filteredPush2 = searchClient.filterData(toPush2);
 			if (filteredPush1.length > 10) {
 				filteredPush1 = filteredPush1.slice(0, 10);
 			}
@@ -53,39 +59,6 @@ var getHome = async function (req, res) {
 		req.session.phone_number = "";
 		req.session.price_threshold = "";
 		flights = [[], []];
-
-		/*
-		flights = [
-			[
-				{
-					"airline": "American Airlines",
-					"path": "SFO --> PHL --> NYC",
-					"duration": "6 hours 15 mins",
-					"price": "$376",
-				},
-				{
-					"airline": "United Airlines",
-					"path": "SFO --> STL --> NYC",
-					"duration": "6 hours 42 mins",
-					"price": "$315",
-				},
-			],
-			[
-				{
-					"airline": "Singapore Airlines",
-					"path": "NYC --> PHL --> SFO",
-					"duration": "6 hours 15 mins",
-					"price": "$376",
-				},
-				{
-					"airline": "Delta Airlines",
-					"path": "NYC --> STL --> SFO",
-					"duration": "6 hours 42 mins",
-					"price": "$315",
-				},
-			]
-		];
-		*/
 	}
 
 	res.render("home.ejs", {
@@ -115,7 +88,17 @@ var postSearch = function (req, res) {
 	res.redirect("/");
 }
 
-// POST /subscribe - creates a subscription
+/**
+ * POST /subscribe - creates a subscription
+ * @param orig: departing airport, eg. LAX
+ * @param dest: departing airport, eg. JFK
+ * @param dep_date: departure date YYYY-MM-DD, eg. "2023-05-31"
+ * @param ret_date: return date YYYY-MM-DD, eg. "2023-05-34" (if null, then one-way)
+ * @param num_adults: the number of travelers (integer > 0), eg. 1
+ * @param name: name of user, eg. "John Doe"
+ * @param phone_number: mobile number of user +1-xxx-xxx-xxxx, eg +1-123-456-7890
+ * @param price_threshold: price threshold under which to be notified, eg. "250"
+ */
 var postSubscribe = function (req, res) {
 	var source = req.session.orig;
 	var destination = req.session.dest;

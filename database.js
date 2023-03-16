@@ -2,12 +2,12 @@
 var AWS = require('aws-sdk');
 AWS.config.update({ region: 'us-east-1' });
 var db = new AWS.DynamoDB();
-var docClient = new AWS.DynamoDB.DocumentClient()
 
+// Constants
 const CacheTableName = "HiddenCities"
 const SubscriptionTableName = "Subscriptions"
 
-//--------------------------Cache Table Functions--------------------------------//
+// Cache Table
 
 /**
  * Returns the entire Cache Table
@@ -47,7 +47,7 @@ async function getHiddenCities(source, destination) {
 }
 
 
-//--------------------------Subscription Table Functions--------------------------------//
+// Subscription Table
 
 /**
  * Adds a subscription to the DynamoDB Subscription Table

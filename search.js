@@ -17,16 +17,19 @@ async function findAllOneWayFlights(origin, dest, date, num_adults) {
         });
 
         var results = []
-        const directSearch = await duffelClient.oneWayLookup(origin, dest, date, num_adults);
-        results = results.concat(directSearch.offers);
 
         if (requisiteRow.length > 0) {
             const zArrayFromRow = requisiteRow[0].Z;
-            for (let i = 0; i < zArrayFromRow.length; i++) {
-                const res = await duffelClient.oneWayLookup(origin, zArrayFromRow[i], date, num_adults);
-                const filtered = filterJSONResult(res.offers, dest)
+            zArrayFromRow.push(dest)
+            //console.log(zArrayFromRow)
+            resultsList = await fetchData(origin, zArrayFromRow, date, num_adults)
+            for(let i = 0; i < resultsList.length; i+=1) {
+                const filtered = filterJSONResult(resultsList[i].offers, dest)
                 results = results.concat(filtered);
             }
+        } else {
+            const directSearch = await duffelClient.oneWayLookup(origin, dest, date, num_adults);
+            results = results.concat(directSearch.offers);
         }
 
         results2 = []
@@ -41,6 +44,12 @@ async function findAllOneWayFlights(origin, dest, date, num_adults) {
         console.log(e);
         return e;
     }
+}
+
+async function fetchData(origin, zArray, dep_date, num_adults) {
+    const promises = zArray.map(arg => duffelClient.oneWayLookup(origin, arg, dep_date, num_adults));
+    const results = await Promise.all(promises);
+	return results
 }
 
 /**

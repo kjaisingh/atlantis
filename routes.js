@@ -23,8 +23,12 @@ var getHome = async function (req, res) {
 		var price_threshold = req.session.price_threshold;
 		if (!ret_date) {
 			var toPush = await duffel.findAllOneWayFlights(orig, dest, dep_date, num_adults);
-			flights.push(duffel.filterData(toPush))
-			flights.push([])
+			var filteredPush = duffel.filterData(toPush);
+			if (filteredPush.length > 10) {
+				filteredPush = filteredPush.slice(0, 10);
+			}
+			flights.push(filteredPush);
+			flights.push([]);
 		} else {
 			var toPush1 = await duffel.findAllOneWayFlights(orig, dest, dep_date, num_adults);
 			var toPush2 = await duffel.findAllOneWayFlights(dest, orig, ret_date, num_adults);

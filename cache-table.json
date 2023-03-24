@@ -17930,7 +17930,12 @@
         "Y": "ATL",
         "Z": [
             "DFW",
-            "TPA"
+            "TPA",
+            "JAX",
+            "PSP",
+            "SMF",
+            "MIA",
+            "FLL"
         ]
     },
     {
@@ -25684,7 +25689,8 @@
             "BUR",
             "ONT",
             "SNA",
-            "SLC"
+            "SLC",
+            "SEA"
         ]
     },
     {
@@ -29519,7 +29525,12 @@
         "Y": "ATL",
         "Z": [
             "DFW",
-            "TPA"
+            "TPA",
+            "SMF",
+            "PSP",
+            "JAX",
+            "MIA",
+            "FLL"
         ]
     },
     {
@@ -37954,7 +37965,8 @@
             "BUR",
             "ONT",
             "SNA",
-            "SLC"
+            "SLC",
+            "SNA"
         ]
     },
     {

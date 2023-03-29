@@ -23,6 +23,7 @@ function handleSubscriptions() {
                 notif += `Unfortunately, the price of your desired trip for ${split[2]} travelers from ${split[0]} to ${split[1]} departing on ${split[3]} never fell below your threshold of $${entry.price_threshold.N}.\n\n`;
                 notif += `Thanks for being an Atlantis customer!`;
 
+
                 twilioClient.sendTextNotification(notif, entry.mobile_number.S);
                 db.deleteSubscription(entry.itinerary.S, entry.mobile_number.S);
             } else if (!return_date) {
@@ -37,6 +38,7 @@ function handleSubscriptions() {
                         } else {
                             notif += `For ${old_split[2]} travelers, the total cost is $${filtered_results[0].price}. The flight is operated by ${filtered_results[0].airline} and follows this path: ${filtered_results[0].path}\n\n`;
                         }
+                        notif += `Here\'s a booking link: ${filtered_results[0].bookingLink}`;
                         notif += `Thanks for being an Atlantis customer!`;
 
                         twilioClient.sendTextNotification(notif, entry.mobile_number.S);
@@ -59,8 +61,10 @@ function handleSubscriptions() {
                                 notif += `For ${old_split[2]} travelers, the total cost is $${total_price}.\n\n`;
                             }
                             notif += `The departing flight is operated by ${filtered_depart_results[0].airline} and follows this path: ${filtered_depart_results[0].path}\n\n`;
+                            notif += `Here\'s the booking link: ${filtered_depart_results[0].bookingLink}`;
                             notif += `The returning flight is operated by ${filtered_return_results[0].airline} and follows this path: ${filtered_return_results[0].path}\n\n`;
                             notif += `Thanks for being an Atlantis customer!`;
+                            notif += `Here\'s the booking link: ${filtered_return_results[1].bookingLink}`;
 
                             twilioClient.sendTextNotification(notif, entry.mobile_number.S);
                             db.deleteSubscription(entry.itinerary.S, entry.mobile_number.S);

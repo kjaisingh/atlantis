@@ -19,11 +19,12 @@ async function findAllOneWayFlights(origin, dest, date, num_adults) {
         var results = []
 
         if (requisiteRow.length > 0) {
-            const zArrayFromRow = requisiteRow[0].Z;
+            var zArrayFromRow = requisiteRow[0].Z;
+            zArrayFromRow = zArrayFromRow.filter(e => e !== origin);
             zArrayFromRow.push(dest)
             //console.log(zArrayFromRow)
             resultsList = await fetchData(origin, zArrayFromRow, date, num_adults)
-            for(let i = 0; i < resultsList.length; i+=1) {
+            for (let i = 0; i < resultsList.length; i += 1) {
                 const filtered = filterJSONResult(resultsList[i].offers, dest)
                 results = results.concat(filtered);
             }
@@ -49,7 +50,7 @@ async function findAllOneWayFlights(origin, dest, date, num_adults) {
 async function fetchData(origin, zArray, dep_date, num_adults) {
     const promises = zArray.map(arg => duffelClient.oneWayLookup(origin, arg, dep_date, num_adults));
     const results = await Promise.all(promises);
-	return results
+    return results
 }
 
 /**
@@ -87,23 +88,54 @@ async function findAllRoundTripFlights(origin, dest, departure_date, return_date
  * @param {*} data 
  * @returns 
  */
-function filterData(data) {
+function filterData(data, num_adults, dest) {
     retList = []
     for (let i = 0; i < data.length; i += 1) {
         currSegs = data[i].segments
         currObj = {}
         currObj.airline = currSegs[0].carrierName
         path = currSegs[0].origin
+        layovers = []
+        var destIndex = -1
         for (let j = 0; j < currSegs.length; j += 1) {
             nextDest = " → ".concat(currSegs[j].destination)
+            if (currSegs.length >= 2 && j < currSegs.length - 1) {
+                layovers.push(currSegs[j].destination)
+            }
+            if (currSegs[j].destination === dest) {
+                destIndex = j
+            }
             path = path.concat(nextDest)
         }
+        const options = {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: 'numeric',
+            minute: 'numeric',
+            hour12: true
+        };
         currObj.path = path
         currObj.price = data[i].price
-        currObj.duration = data[i].totalDuration
+        currObj.bookingLink = getBookingLink(currSegs[0].origin, currSegs[currSegs.length - 1].destination, currSegs[0].departureTime.substring(0, 10), currSegs[0].carrierCode, layovers, num_adults)
+        currObj.departureTime = new Date(currSegs[0].departureTime).toLocaleString('en-US', options);
+        currObj.arrivalTime = new Date(currSegs[destIndex].arrivalTime).toLocaleString('en-US', options);
         retList.push(currObj)
     }
     return retList
+}
+
+function getBookingLink(source, dest, date, airline, layovers, num_adults) {
+    var link = "https://www.kayak.com/flights/"
+    var layoverString = ""
+    if (layovers.length > 0) {
+        layoverString = layoverString.concat(layovers[0])
+    }
+    for (let i = 1; i < layovers.length; i += 1) {
+        layoverString = layoverString.concat("\,", layovers[i])
+    }
+    link = link.concat(source, "-", dest, "/", date, "/", num_adults, "adults?sort=price_a&fs=airlines=~", airline, ";stops=~", layovers.length, ";layoverair=", layoverString);
+    return link;
 }
 
 /**
@@ -259,4 +291,5 @@ module.exports = {
     filterData,
     findAllOneWayFlights,
     findAllRoundTripFlights,
+    getBookingLink
 };

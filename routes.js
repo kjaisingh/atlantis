@@ -28,18 +28,20 @@ var getHome = async function (req, res) {
 		var phone_number = req.session.phone_number;
 		var price_threshold = req.session.price_threshold;
 		if (!ret_date) {
+			//spinner
 			var toPush = await searchClient.findAllOneWayFlights(orig, dest, dep_date, num_adults);
-			var filteredPush = searchClient.filterData(toPush);
+			var filteredPush = searchClient.filterData(toPush, num_adults, dest);
 			if (filteredPush.length > 10) {
 				filteredPush = filteredPush.slice(0, 10);
 			}
 			flights.push(filteredPush);
 			flights.push([])
 		} else {
+			//spinner
 			var toPush1 = await searchClient.findAllOneWayFlights(orig, dest, dep_date, num_adults);
 			var toPush2 = await searchClient.findAllOneWayFlights(dest, orig, ret_date, num_adults);
-			var filteredPush1 = searchClient.filterData(toPush1);
-			var filteredPush2 = searchClient.filterData(toPush2);
+			var filteredPush1 = searchClient.filterData(toPush1, num_adults, dest);
+			var filteredPush2 = searchClient.filterData(toPush2, num_adults, dest);
 			if (filteredPush1.length > 10) {
 				filteredPush1 = filteredPush1.slice(0, 10);
 			}
@@ -50,16 +52,21 @@ var getHome = async function (req, res) {
 			flights.push(filteredPush2);
 		}
 	} else {
-		req.session.orig = "";
-		req.session.dest = "";
-		req.session.dep_date = "";
-		req.session.ret_date = "";
-		req.session.num_adults = "";
-		req.session.name = "";
-		req.session.phone_number = "";
-		req.session.price_threshold = "";
 		flights = [[], []];
 	}
+
+	// else {
+	// 	req.session.orig = "";
+	// 	req.session.dest = "";
+	// 	req.session.dep_date = "";
+	// 	req.session.ret_date = "";
+	// 	req.session.num_adults = "";
+	// 	req.session.name = "";
+	// 	req.session.phone_number = "";
+	// 	req.session.price_threshold = "";
+	// 	flights = [[], []];
+	// }
+
 
 	res.render("home.ejs", {
 		data: flights, options: airports,
@@ -84,8 +91,14 @@ var postSearch = function (req, res) {
 	req.session.name = obj.name;
 	req.session.phone_number = obj.phone_number;
 	req.session.price_threshold = obj.price_threshold;
-
+	// 2023-03-30
 	res.redirect("/");
+}
+
+function checkDate(startDate, fromDate) {
+	var todaysDate = new Date(dt.getTime() + offset * 60 * 1000);
+
+
 }
 
 /**
@@ -105,14 +118,18 @@ var postSubscribe = function (req, res) {
 	var number_travelers = req.session.num_adults;
 	var departure_date = req.session.dep_date;
 	var return_date = req.session.ret_date;
-	var threshold = req.session.price_threshold;
-	var name = req.session.name;
-	var number = req.session.phone_number;
+	var name = req.body.name;
+	var number = req.body.phone_number;
+	var threshold = req.body.price_threshold;
 
 	db.addSubscription(source, destination, number_travelers, departure_date, return_date, threshold, name, number, function (err, data) {
 		if (err) {
+			//error popup
+			console.log(err);
 			res.redirect("/home");
 		} else {
+			//success popup
+			console.log("success");
 			res.send({ success: true });
 		}
 	});

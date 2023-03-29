@@ -34,8 +34,8 @@ const server = app.listen(port, () => {
 });
 
 async function fetchData(origin, zArray, dep_date, num_adults) {
-    const promises = zArray.map(arg => duffelClient.oneWayLookup(origin, arg, dep_date, num_adults));
-    const results = await Promise.all(promises);
+	const promises = zArray.map(arg => duffelClient.oneWayLookup(origin, arg, dep_date, num_adults));
+	const results = await Promise.all(promises);
 	return results
 }
 

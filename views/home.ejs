@@ -17,27 +17,8 @@
   <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
 </head>
 
-<!-- Header -->
-
 <body id="page-top">
-  <!-- SCRIPT: Populating Dropdowns -->
-  <script type="text/javascript">
-    var options = "<%= options %>".split(",");
-    var datalistFrom = document.getElementById("airports-from");
-    var datalistTo = document.getElementById("airports-to");
-
-    options.forEach(function (item) {
-      var option = document.createElement('option');
-      option.value = item;
-      datalistFrom.appendChild(option);
-    });
-    options.forEach(function (item) {
-      var option = document.createElement('option');
-      option.value = item;
-      datalistTo.appendChild(option);
-    });
-  </script>
-
+  <!-- Header -->
   <nav class="navbar navbar-expand-lg navbar-dark navbar-custom fixed-top">
     <div class="container px-5 justify-content-center">
       <a class="navbar-brand" href="#page-top">Atlantis</a>
@@ -111,6 +92,24 @@
     </body>
     </div>
   </section>
+
+  <!-- SCRIPT: Populating Dropdowns -->
+  <script type="text/javascript">
+    var options = "<%= options %>".split(",");
+    var datalistFrom = document.getElementById("airports-from");
+    var datalistTo = document.getElementById("airports-to");
+    
+    options.forEach(function (item) {
+      var option = document.createElement('option');
+      option.value = item;
+      datalistFrom.appendChild(option);
+    });
+    options.forEach(function (item) {
+      var option = document.createElement('option');
+      option.value = item;
+      datalistTo.appendChild(option);
+    });
+  </script>
 
   <!-- Results Table -->
   <section>
@@ -272,6 +271,7 @@
                 <div class="form-group my-3 button-wrapper">
                   <button class="btn btn-primary rounded-0 d-flex justify-content-center text-center p-3"
                     id="ajaxSubmit"> Subscribe </button>
+                  <!-- SCRIPT: Button Clicking -->
                   <script>
                     var inputNameField = document.getElementById('inputNameField');
                     var inputNumberField = document.getElementById('inputNumberField');

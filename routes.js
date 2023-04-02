@@ -6,6 +6,7 @@ var bodyParser = require('body-parser');
 
 // Initialize static data
 var airports = fs.readFileSync("views/table-data.txt").toString('utf-8').split("\n");
+console.log(airports);
 
 // Routes
 
@@ -54,19 +55,6 @@ var getHome = async function (req, res) {
 	} else {
 		flights = [[], []];
 	}
-
-	// else {
-	// 	req.session.orig = "";
-	// 	req.session.dest = "";
-	// 	req.session.dep_date = "";
-	// 	req.session.ret_date = "";
-	// 	req.session.num_adults = "";
-	// 	req.session.name = "";
-	// 	req.session.phone_number = "";
-	// 	req.session.price_threshold = "";
-	// 	flights = [[], []];
-	// }
-
 
 	res.render("home.ejs", {
 		data: flights, options: airports,

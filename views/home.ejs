@@ -99,11 +99,16 @@
           </div>
           <div class="form-group my-3 button-wrapper">
             <button class="btn btn-primary rounded-0 d-flex justify-content-center text-center p-3"
-              onclick="this.disabled=true;this.value='Searching...'; this.form.submit();">Search
+              onclick="this.disabled=true;this.value='Searching...'; this.form.submit(); document.getElementById('contents').style.visibility='visible';">Search
               Flights</button>
           </div>
         </form>
       </div>
+      <body>
+        <div id="contents" style="visibility:hidden" class="h-100 d-flex align-items-center justify-content-center">
+          <img src="https://discuss.wxpython.org/uploads/default/original/2X/6/6d0ec30d8b8f77ab999f765edd8866e8a97d59a3.gif">
+        </div>
+    </body>
     </div>
   </section>
 
@@ -111,7 +116,7 @@
   <section>
     <div class="container px-5">
       <!-- Departures -->
-      <% if(data[0].length> 0){ %>
+      <% if(data[0].length > 0){ %>
         <h3>Departures to <%= dest %> on <%= dep_date %>
         </h3>
         <div class="row">
@@ -129,7 +134,26 @@
                     </tr>
                   </thead>
                   <tbody class="customtable">
-                    <% for (var i=0; i < data[0].length; i++) { %>
+                    <tr style="background-color: #d6d3c9;">
+                      <td>
+                        <%= data[0][0].airline %>
+                      </td>
+                      <td>
+                        <%= data[0][0].path %>
+                      </td>
+                      <td>
+                        <%= data[0][0].departureTime %>
+                      </td>
+                      <td>
+                        <%= data[0][0].arrivalTime %>
+                      </td>
+                      <td>
+                        <a href="<%= data[0][0].bookingLink %>">
+                          <%= data[0][0].price %>
+                        </a>
+                      </td>
+                    </tr>
+                    <% for (var i=1; i < data[0].length; i++) { %>
                       <tr>
                         <td>
                           <%= data[0][i].airline %>
@@ -177,7 +201,26 @@
                         </tr>
                       </thead>
                       <tbody class="customtable">
-                        <% for (var i=0; i < data[1].length; i++) { %>
+                        <tr style="background-color: #d6d3c9;">
+                          <td>
+                            <%= data[1][0].airline %>
+                          </td>
+                          <td>
+                            <%= data[1][0].path %>
+                          </td>
+                          <td>
+                            <%= data[1][0].departureTime %>
+                          </td>
+                          <td>
+                            <%= data[1][0].arrivalTime %>
+                          </td>
+                          <td>
+                            <a href="<%= data[1][0].bookingLink %>">
+                              <%= data[1][0].price %>
+                            </a>
+                          </td>
+                        </tr>
+                        <% for (var i=1; i < data[1].length; i++) { %>
                           <tr>
                             <td>
                               <%= data[1][i].airline %>

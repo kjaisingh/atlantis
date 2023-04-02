@@ -1,6 +1,7 @@
 // Imports
 const duffelClient = require('./duffel-client');
 const cacheTable = require('./cache-table.json');
+const e = require('express');
 
 /**
  * Returns a list of the one way flights in order of increasing price
@@ -90,6 +91,7 @@ async function findAllRoundTripFlights(origin, dest, departure_date, return_date
  */
 function filterData(data, num_adults, dest) {
     retList = []
+    var directPutOnTop = false;
     for (let i = 0; i < data.length; i += 1) {
         currSegs = data[i].segments
         currObj = {}
@@ -120,7 +122,12 @@ function filterData(data, num_adults, dest) {
         currObj.bookingLink = getBookingLink(currSegs[0].origin, currSegs[currSegs.length - 1].destination, currSegs[0].departureTime.substring(0, 10), currSegs[0].carrierCode, layovers, num_adults)
         currObj.departureTime = new Date(currSegs[0].departureTime).toLocaleString('en-US', options);
         currObj.arrivalTime = new Date(currSegs[destIndex].arrivalTime).toLocaleString('en-US', options);
-        retList.push(currObj)
+        if (!directPutOnTop && (currSegs[currSegs.length - 1].destination === dest)) {
+            retList.unshift(currObj);
+            directPutOnTop = true;
+        } else {
+            retList.push(currObj)
+        }   
     }
     return retList
 }

@@ -30,8 +30,8 @@ var getHome = async function (req, res) {
 		var price_threshold = req.session.price_threshold;
 		if (!ret_date) {
 			//spinner
-			var toPush = await searchClient.findAllOneWayFlights(orig, dest, dep_date, num_adults);
-			var filteredPush = searchClient.filterData(toPush, num_adults, dest);
+			var filteredPush = await searchClient.findAllOneWayFlights(orig, dest, dep_date, num_adults)
+			// var filteredPush = searchClient.filterData(toPush, num_adults, dest);
 			if (filteredPush.length > 10) {
 				filteredPush = filteredPush.slice(0, 10);
 			}
@@ -39,10 +39,23 @@ var getHome = async function (req, res) {
 			flights.push([])
 		} else {
 			//spinner
-			var toPush1 = await searchClient.findAllOneWayFlights(orig, dest, dep_date, num_adults);
-			var toPush2 = await searchClient.findAllOneWayFlights(dest, orig, ret_date, num_adults);
-			var filteredPush1 = searchClient.filterData(toPush1, num_adults, dest);
-			var filteredPush2 = searchClient.filterData(toPush2, num_adults, dest);
+			//var toPush1 = await searchClient.findAllOneWayFlights(orig, dest, dep_date, num_adults);
+			//var toPush2 = await searchClient.findAllOneWayFlights(dest, orig, ret_date, num_adults);
+			//const fs = require('fs');
+			// fs.writeFile('debug_results.json', JSON.stringify(toPush1), err => {
+			// 	if (err) {
+			// 		console.error(err);
+			// 	}
+			// });
+			// fs.writeFile('debug_results_2.json', JSON.stringify(toPush2), err => {
+			// 	if (err) {
+			// 		console.error(err);
+			// 	}
+			// });
+			var filteredPush1 = await searchClient.findAllOneWayFlights(orig, dest, dep_date, num_adults);
+			var filteredPush2 = await searchClient.findAllOneWayFlights(dest, orig, ret_date, num_adults);
+			// var filteredPush1 = searchClient.filterData(toPush1, num_adults, dest);
+			// var filteredPush2 = searchClient.filterData(toPush2, num_adults, dest);
 			if (filteredPush1.length > 10) {
 				filteredPush1 = filteredPush1.slice(0, 10);
 			}

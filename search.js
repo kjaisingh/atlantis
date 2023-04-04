@@ -41,6 +41,7 @@ async function findAllOneWayFlights(origin, dest, date, num_adults) {
         }
 
         results2.sort(function (a, b) { return a.price - b.price; });
+        results2 = filterData(results2, num_adults, dest);
         return results2;
     } catch (e) {
         console.log(e);
@@ -121,6 +122,12 @@ function filterData(data, num_adults, dest) {
         currObj.price = data[i].price
         currObj.bookingLink = getBookingLink(currSegs[0].origin, currSegs[currSegs.length - 1].destination, currSegs[0].departureTime.substring(0, 10), currSegs[0].carrierCode, layovers, num_adults)
         currObj.departureTime = new Date(currSegs[0].departureTime).toLocaleString('en-US', options);
+        if (destIndex === -1) {
+            console.log(destIndex);
+            console.log(currSegs[destIndex]);
+            console.log(currSegs);
+            continue;
+        }
         currObj.arrivalTime = new Date(currSegs[destIndex].arrivalTime).toLocaleString('en-US', options);
         if (!directPutOnTop && (currSegs[currSegs.length - 1].destination === dest)) {
             retList.unshift(currObj);

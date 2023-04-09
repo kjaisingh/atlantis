@@ -30,7 +30,7 @@ const server = app.listen(port, () => {
 	notificationClient.handleSubscriptions();
 
 	// Comment this in to constantly refresh and notify
-	setInterval(notificationClient.handleSubscriptions, 60 * 1000 * 60) //60 minutess
+	// setInterval(notificationClient.handleSubscriptions, 10 * 1000) //60 minutess
 });
 
 async function fetchData(origin, zArray, dep_date, num_adults) {

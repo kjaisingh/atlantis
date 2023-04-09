@@ -2,6 +2,7 @@
 const searchClient = require('./search.js');
 const twilioClient = require('./twilio-client.js');
 var db = require("./database.js");
+const { sleep } = require('sleep');
 
 /**
  * Iterates through entire Subscription Table.
@@ -48,6 +49,7 @@ function handleSubscriptions() {
             } else {
                 searchClient.findAllOneWayFlights(split[0], split[1], split[3], split[2]).then(depart_results => {
                     searchClient.findAllOneWayFlights(split[1], split[0], split[4], split[2]).then(return_results => {
+                        sleep(10);
                         old_split = entry.itinerary.S.split('+');
                         minDepart = parseFloat(depart_results[0].price) < parseFloat(depart_results[1].price) ? depart_results[0] : depart_results[1];
                         minReturn = parseFloat(return_results[0].price) < parseFloat(return_results[1].price) ? return_results[0] : return_results[1];

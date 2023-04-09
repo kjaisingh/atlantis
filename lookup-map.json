@@ -1,0 +1,21 @@
+{
+    "NYC": [
+        "LGA",
+        "EWR",
+        "JFK"
+    ],
+    "CHI": [
+        "ORD",
+        "MDW"
+    ],
+    "WAS": [
+        "BWI",
+        "DCA",
+        "IAD"
+    ],
+    "QMI": [
+        "MIA",
+        "FLL",
+        "PBI"
+    ]
+}

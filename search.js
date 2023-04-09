@@ -1,6 +1,7 @@
 // Imports
 const duffelClient = require('./duffel-client');
 const cacheTable = require('./cache-table.json');
+const lookupMap = require('./lookup-map.json');
 const e = require('express');
 
 /**
@@ -23,7 +24,6 @@ async function findAllOneWayFlights(origin, dest, date, num_adults) {
             var zArrayFromRow = requisiteRow[0].Z;
             zArrayFromRow = zArrayFromRow.filter(e => e !== origin);
             zArrayFromRow.push(dest)
-            //console.log(zArrayFromRow)
             resultsList = await fetchData(origin, zArrayFromRow, date, num_adults)
             for (let i = 0; i < resultsList.length; i += 1) {
                 const filtered = filterJSONResult(resultsList[i].offers, dest)
@@ -105,7 +105,8 @@ function filterData(data, num_adults, dest) {
             if (currSegs.length >= 2 && j < currSegs.length - 1) {
                 layovers.push(currSegs[j].destination)
             }
-            if (currSegs[j].destination === dest) {
+            cities = lookupMap[dest] ? lookupMap[dest] : [dest];
+            if (cities.includes(currSegs[j].destination)) {
                 destIndex = j
             }
             path = path.concat(nextDest)
@@ -123,9 +124,6 @@ function filterData(data, num_adults, dest) {
         currObj.bookingLink = getBookingLink(currSegs[0].origin, currSegs[currSegs.length - 1].destination, currSegs[0].departureTime.substring(0, 10), currSegs[0].carrierCode, layovers, num_adults)
         currObj.departureTime = new Date(currSegs[0].departureTime).toLocaleString('en-US', options);
         if (destIndex === -1) {
-            console.log(destIndex);
-            console.log(currSegs[destIndex]);
-            console.log(currSegs);
             continue;
         }
         currObj.arrivalTime = new Date(currSegs[destIndex].arrivalTime).toLocaleString('en-US', options);
@@ -134,7 +132,7 @@ function filterData(data, num_adults, dest) {
             directPutOnTop = true;
         } else {
             retList.push(currObj)
-        }   
+        }
     }
     return retList
 }

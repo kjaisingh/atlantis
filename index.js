@@ -27,10 +27,10 @@ app.post('/subscribe', routes.post_subscribe);
 const port = 80;
 const server = app.listen(port, () => {
 	console.log(`Now listening on port ${port}`);
-	notificationClient.handleSubscriptions();
+	// notificationClient.handleSubscriptions();
 
 	// Comment this in to constantly refresh and notify
-	// setInterval(notificationClient.handleSubscriptions, 10 * 1000) //60 minutess
+	setInterval(notificationClient.handleSubscriptions, 10 * 1000) //60 minutess
 });
 
 async function fetchData(origin, zArray, dep_date, num_adults) {

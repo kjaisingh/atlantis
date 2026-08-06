@@ -1,0 +1,15 @@
+name: Check subscriptions
+
+on:
+  schedule:
+    - cron: '0 13 * * *'
+  workflow_dispatch: {}
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger check on the deployed app
+        run: |
+          curl -fsS -X POST "${{ secrets.ATLANTIS_URL }}/api/jobs/check-subscriptions" \
+            -H "x-job-secret: ${{ secrets.JOB_SECRET }}"

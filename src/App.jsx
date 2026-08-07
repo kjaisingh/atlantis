@@ -41,7 +41,14 @@ export default function App() {
       <div className="container">
         <SearchForm airports={airports} onSearch={handleSearch} loading={loading} />
 
-        {loading && <Spinner />}
+        {loading && (
+          <>
+            <Spinner />
+            <p className="text-muted text-center small">
+              Hidden-city searches check several flight combinations — this can take up to a minute.
+            </p>
+          </>
+        )}
         {error && <p className="text-danger text-center">{error}</p>}
 
         {results && (

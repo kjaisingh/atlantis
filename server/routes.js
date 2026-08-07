@@ -1,10 +1,27 @@
 import { readFileSync } from 'node:fs';
 import express from 'express';
+import rateLimit from 'express-rate-limit';
 import * as db from './db.js';
 import * as jobs from './jobs.js';
 import { findAllOneWayFlights } from './search.js';
 
 const router = express.Router();
+
+const searchLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many searches. Please wait a moment and try again.' },
+});
+
+const subscribeLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many subscription attempts. Please try again later.' },
+});
 
 const airports = readFileSync(new URL('./data/airports.txt', import.meta.url), 'utf-8')
   .split('\n')
@@ -25,11 +42,15 @@ function isValidDate(value) {
   return date >= today;
 }
 
+function isReturnDateValid(departureDate, returnDate) {
+  return new Date(`${returnDate}T00:00:00`) >= new Date(`${departureDate}T00:00:00`);
+}
+
 router.get('/airports', (_req, res) => {
   res.json(airports);
 });
 
-router.post('/search', async (req, res) => {
+router.post('/search', searchLimiter, async (req, res) => {
   const { origin, destination, departureDate, returnDate, travelers } = req.body;
   const numTravelers = Number(travelers);
 
@@ -44,6 +65,9 @@ router.post('/search', async (req, res) => {
   }
   if (returnDate && !isValidDate(returnDate)) {
     return res.status(400).json({ error: 'Return date must be a valid, non-past date.' });
+  }
+  if (returnDate && !isReturnDateValid(departureDate, returnDate)) {
+    return res.status(400).json({ error: 'Return date must be on or after the departure date.' });
   }
   if (!Number.isInteger(numTravelers) || numTravelers < 1 || numTravelers > 9) {
     return res.status(400).json({ error: 'Travelers must be an integer between 1 and 9.' });
@@ -65,7 +89,7 @@ router.post('/search', async (req, res) => {
   }
 });
 
-router.post('/subscribe', async (req, res) => {
+router.post('/subscribe', subscribeLimiter, async (req, res) => {
   if (!db.isEnabled()) {
     return res.status(503).json({ error: db.getConfigError() });
   }
@@ -94,6 +118,9 @@ router.post('/subscribe', async (req, res) => {
   }
   if (returnDate && !isValidDate(returnDate)) {
     return res.status(400).json({ error: 'Return date must be a valid, non-past date.' });
+  }
+  if (returnDate && !isReturnDateValid(departureDate, returnDate)) {
+    return res.status(400).json({ error: 'Return date must be on or after the departure date.' });
   }
   if (!Number.isInteger(numTravelers) || numTravelers < 1 || numTravelers > 9) {
     return res.status(400).json({ error: 'Travelers must be an integer between 1 and 9.' });
@@ -126,8 +153,13 @@ router.post('/jobs/check-subscriptions', async (req, res) => {
     return res.status(401).json({ error: 'Unauthorized.' });
   }
 
-  const result = await jobs.checkSubscriptions();
-  res.json(result);
+  try {
+    const result = await jobs.checkSubscriptions();
+    res.json(result);
+  } catch (err) {
+    console.error('[routes] check-subscriptions failed:', err.message);
+    res.status(500).json({ error: 'Subscription check failed.' });
+  }
 });
 
 export default router;

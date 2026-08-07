@@ -51,6 +51,10 @@ round-trip search can bump up against on its own. Requests are sent sequentially
 parallel, and a 429 response triggers a wait-and-retry keyed off Duffel's `ratelimit-reset` header
 rather than a blind fixed delay.
 
+Atlantis's own API also rate-limits per client IP, independent of Duffel's: `/api/search` allows 10
+requests per minute, `/api/subscribe` allows 20 per hour. Both return a 429 with a plain-English
+message when exceeded.
+
 
 ## Feature Backlog
 - Expand the hidden-city candidate cache beyond its current ~600 origin airports.

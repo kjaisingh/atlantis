@@ -25,41 +25,45 @@ export async function checkSubscriptions() {
   for (const subscription of subscriptions) {
     checked += 1;
 
-    if (isExpired(subscription)) {
-      await sendExpiredEmail(subscription);
-      await db.deleteSubscription(subscription.id);
-      continue;
-    }
+    try {
+      if (isExpired(subscription)) {
+        await sendExpiredEmail(subscription);
+        await db.deleteSubscription(subscription.id);
+        continue;
+      }
 
-    const outbound = await cheapestItinerary(
-      subscription.origin,
-      subscription.destination,
-      subscription.departure_date,
-      subscription.num_travelers,
-    );
-
-    if (!outbound) {
-      continue;
-    }
-
-    let totalPrice = parseFloat(outbound.price);
-
-    if (subscription.return_date) {
-      const inbound = await cheapestItinerary(
-        subscription.destination,
+      const outbound = await cheapestItinerary(
         subscription.origin,
-        subscription.return_date,
+        subscription.destination,
+        subscription.departure_date,
         subscription.num_travelers,
       );
-      if (inbound) {
-        totalPrice += parseFloat(inbound.price);
-      }
-    }
 
-    if (totalPrice <= subscription.price_threshold) {
-      matched += 1;
-      await sendPriceAlertEmail(subscription, outbound);
-      await db.markNotified(subscription.id);
+      if (!outbound) {
+        continue;
+      }
+
+      let totalPrice = parseFloat(outbound.price);
+
+      if (subscription.return_date) {
+        const inbound = await cheapestItinerary(
+          subscription.destination,
+          subscription.origin,
+          subscription.return_date,
+          subscription.num_travelers,
+        );
+        if (inbound) {
+          totalPrice += parseFloat(inbound.price);
+        }
+      }
+
+      if (totalPrice <= subscription.price_threshold) {
+        matched += 1;
+        await sendPriceAlertEmail(subscription, outbound);
+        await db.markNotified(subscription.id);
+      }
+    } catch (err) {
+      console.error(`[jobs] failed processing subscription ${subscription.id}:`, err.message);
     }
   }
 

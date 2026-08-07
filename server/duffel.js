@@ -37,6 +37,7 @@ async function requestOffers(slices, passengers, attempt = 0) {
     }
     const reset = Date.parse(err.response.headers['ratelimit-reset']);
     const delayMs = Number.isNaN(reset) ? 2000 : Math.max(reset - Date.now(), 0) + 250;
+    console.warn(`[duffel] rate limited (attempt ${attempt + 1}/${MAX_RATE_LIMIT_RETRIES}), retrying in ${delayMs}ms`);
     await sleep(delayMs);
     return requestOffers(slices, passengers, attempt + 1);
   }

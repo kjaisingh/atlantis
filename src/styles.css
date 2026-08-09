@@ -5,6 +5,21 @@
   --bs-secondary-rgb: 255, 106, 0;
 }
 
+/* Bootstrap 5.3 bakes .btn-primary's colors into component-scoped
+   --bs-btn-* variables at Bootstrap's own build time, so redeclaring
+   --bs-primary above doesn't retint it — override those explicitly. */
+.btn-primary {
+  --bs-btn-bg: var(--bs-primary);
+  --bs-btn-border-color: var(--bs-primary);
+  --bs-btn-hover-bg: #db086f;
+  --bs-btn-hover-border-color: #db086f;
+  --bs-btn-active-bg: #ca0867;
+  --bs-btn-active-border-color: #ca0867;
+  --bs-btn-disabled-bg: var(--bs-primary);
+  --bs-btn-disabled-border-color: var(--bs-primary);
+  --bs-btn-focus-shadow-rgb: var(--bs-primary-rgb);
+}
+
 /* Results Table */
 .card {
   margin-bottom: 100px;
@@ -122,10 +137,13 @@
 .wrapper form .form-control {
   outline: none;
   border: none;
+  border-bottom: 1px solid #dee2e6;
+  border-radius: 0;
 }
 
 .wrapper form .form-control:focus {
   box-shadow: none;
+  border-bottom-color: var(--bs-primary);
 }
 
 .wrapper form input[type="text"]:focus::placeholder {
@@ -303,8 +321,9 @@ header.masthead .bg-circle-4 {
   }
 }
 
-/* Results row highlight */
-.highlight-row {
+/* Results row highlight (Bootstrap paints background-color on each td/th
+   directly, so the row-level rule alone never shows — target the cells) */
+tr.highlight-row > td {
   background-color: #d6d3c9;
 }
 

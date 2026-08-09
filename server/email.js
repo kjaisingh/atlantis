@@ -1,7 +1,7 @@
 import nodemailer from 'nodemailer';
 
 const hasSmtp = Boolean(
-  process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS,
+  process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS && process.env.SMTP_FROM,
 );
 
 const transporter = hasSmtp

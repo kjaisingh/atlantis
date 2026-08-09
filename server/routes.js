@@ -111,6 +111,9 @@ router.post('/subscribe', subscribeLimiter, async (req, res) => {
   if (!airportSet.has(origin) || !airportSet.has(destination)) {
     return res.status(400).json({ error: 'Unknown origin or destination airport code.' });
   }
+  if (origin === destination) {
+    return res.status(400).json({ error: 'Origin and destination must differ.' });
+  }
   if (!isValidDate(departureDate)) {
     return res.status(400).json({ error: 'Departure date must be a valid, non-past date.' });
   }

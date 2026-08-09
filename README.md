@@ -38,18 +38,22 @@ it has no concept of hidden-city fares on its own. Atlantis builds that on top:
 1. A precomputed cache (`server/data/cache-table.json` + `lookup-map.json`) maps each origin airport
    to a shortlist of destinations that are known to have flights routing through it as a layover —
    roughly 600 origin airports and ~6,000 candidate routes in total.
-2. A search looks up the requested origin in that cache, then fires off a Duffel `offer_request` for
-   the direct route plus one for every candidate destination on the shortlist.
+2. A search looks up the requested origin in that cache, then fires off up to 4 Duffel
+   `offer_request`s per direction: one for the direct route to your destination, plus up to 3 of the
+   cache's candidate hidden-city destinations for that origin. That cap keeps a full round trip
+   (both directions) comfortably under Duffel's rate-limit window without a wait in the common case.
 3. Each result is normalized to a common shape (segments, layovers, price, cabin), the metro-area
    aliases in the destination are resolved so, say, all of London's airports count as the same city,
    and everything is sorted by price with the direct fare always surfaced first.
 4. Round trips run this whole process twice — once per direction — and pair up outbound/inbound
    results independently rather than cross-producing every combination.
 
-Duffel's live-account rate limit is a fixed window (10 requests per ~30 seconds), which a single
-round-trip search can bump up against on its own. Requests are sent sequentially rather than in
-parallel, and a 429 response triggers a wait-and-retry keyed off Duffel's `ratelimit-reset` header
-rather than a blind fixed delay.
+Duffel enforces a fixed-window request budget on this account (10 requests per window), reported via
+its `ratelimit-*` response headers rather than a hard concurrency cap. Atlantis tracks that budget
+live off those headers: requests run up to 3 at a time rather than one-by-one, but pause automatically
+whenever the tracked budget hits zero until the window resets. A 429 response is still a safety net —
+it triggers a jittered retry (up to 3 attempts) keyed off Duffel's `ratelimit-reset` header rather
+than a blind fixed delay.
 
 Atlantis's own API also rate-limits per client IP, independent of Duffel's: `/api/search` allows 10
 requests per minute, `/api/subscribe` allows 20 per hour. Both return a 429 with a plain-English
@@ -139,6 +143,11 @@ schedule. Set `JOB_SECRET` identically as a GitHub Actions repository secret and
 and set the workflow's target URL to your deployed app. This also has the side effect of waking a
 free Render instance from its idle spin-down, since Render's free tier sleeps a service after 15
 minutes without traffic.
+
+### Health check
+`GET /api/health` returns `{status: "ok", persistenceEnabled}` and requires no auth. `render.yaml`
+points Render's own health check at this path so a broken deploy gets flagged instead of promoted;
+it also works for any external uptime monitor you want to point at the app.
 
 
 ## Environment Variables

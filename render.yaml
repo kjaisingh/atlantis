@@ -1,11 +1,14 @@
 services:
   - type: web
     name: atlantis
-    runtime: node
+    env: node
     plan: free
-    buildCommand: npm ci && npm run build
+    autoDeploy: true
+    buildCommand: npm install && npm run build
     startCommand: npm start
     envVars:
+      - key: NODE_VERSION
+        value: 22
       - key: NODE_ENV
         value: production
       - key: DUFFEL_API_KEY
@@ -17,7 +20,7 @@ services:
       - key: SMTP_HOST
         sync: false
       - key: SMTP_PORT
-        sync: false
+        value: 587
       - key: SMTP_USER
         sync: false
       - key: SMTP_PASS
@@ -25,4 +28,4 @@ services:
       - key: SMTP_FROM
         sync: false
       - key: JOB_SECRET
-        sync: false
+        generateValue: true

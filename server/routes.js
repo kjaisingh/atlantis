@@ -74,11 +74,13 @@ router.post('/search', searchLimiter, async (req, res) => {
   }
 
   try {
-    const outbound = await findAllOneWayFlights(origin, destination, departureDate, numTravelers);
-    const response = { outbound: outbound.slice(0, 10) };
+    const [outbound, inbound] = await Promise.all([
+      findAllOneWayFlights(origin, destination, departureDate, numTravelers),
+      returnDate ? findAllOneWayFlights(destination, origin, returnDate, numTravelers) : null,
+    ]);
 
-    if (returnDate) {
-      const inbound = await findAllOneWayFlights(destination, origin, returnDate, numTravelers);
+    const response = { outbound: outbound.slice(0, 10) };
+    if (inbound) {
       response.inbound = inbound.slice(0, 10);
     }
 
@@ -90,10 +92,6 @@ router.post('/search', searchLimiter, async (req, res) => {
 });
 
 router.post('/subscribe', subscribeLimiter, async (req, res) => {
-  if (!db.isEnabled()) {
-    return res.status(503).json({ error: db.getConfigError() });
-  }
-
   const {
     name,
     email,
@@ -127,6 +125,9 @@ router.post('/subscribe', subscribeLimiter, async (req, res) => {
   }
   if (!Number.isFinite(threshold) || threshold <= 0) {
     return res.status(400).json({ error: 'Price threshold must be a positive number.' });
+  }
+  if (!db.isEnabled()) {
+    return res.status(503).json({ error: db.getConfigError() });
   }
 
   const subscription = await db.addSubscription({

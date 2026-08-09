@@ -4,6 +4,12 @@ import * as duffelClient from './duffel.js';
 const cacheTable = JSON.parse(readFileSync(new URL('./data/cache-table.json', import.meta.url)));
 const lookupMap = JSON.parse(readFileSync(new URL('./data/lookup-map.json', import.meta.url)));
 
+// Cache-table rows have up to 9 hidden-city candidates; uncapped, one direction alone
+// could need 10 Duffel requests (this account's whole rate-limit window) before a round
+// trip's other direction fires a single request. Capping keeps a full round trip (both
+// directions) comfortably under the 10-request budget without a wait in the common case.
+const MAX_FANOUT_CANDIDATES = 4;
+
 /**
  * Returns one-way itineraries for origin -> dest, cheapest first.
  * Fans out across the cached hidden-city candidates for this pair (if any),
@@ -16,8 +22,8 @@ export async function findAllOneWayFlights(origin, dest, date, numAdults) {
   let offers = [];
 
   if (cacheRow) {
-    const candidates = cacheRow.Z.filter((z) => z !== origin);
-    candidates.push(dest);
+    const zCandidates = cacheRow.Z.filter((z) => z !== origin).slice(0, MAX_FANOUT_CANDIDATES - 1);
+    const candidates = [...zCandidates, dest];
     const resultsList = await fetchData(origin, candidates, date, numAdults);
     for (const offerRequest of resultsList) {
       offers = offers.concat(filterJSONResult(offerRequest.offers, dest));
@@ -34,11 +40,7 @@ export async function findAllOneWayFlights(origin, dest, date, numAdults) {
 }
 
 export async function fetchData(origin, zArray, departureDate, numAdults) {
-  const results = [];
-  for (const z of zArray) {
-    results.push(await duffelClient.oneWayLookup(origin, z, departureDate, numAdults));
-  }
-  return results;
+  return Promise.all(zArray.map((z) => duffelClient.oneWayLookup(origin, z, departureDate, numAdults)));
 }
 
 /**

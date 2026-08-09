@@ -55,7 +55,7 @@ export default function App() {
           <>
             <ResultsTable title="Outbound" itineraries={results.outbound} />
             {results.inbound && <ResultsTable title="Return" itineraries={results.inbound} />}
-            <SubscribeForm searchParams={searchParams} />
+            <SubscribeForm key={JSON.stringify(searchParams)} searchParams={searchParams} />
           </>
         )}
       </div>

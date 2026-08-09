@@ -43,7 +43,7 @@ export default function SubscribeForm({ searchParams }) {
             <input
               type="text"
               className="form-control"
-              placeholder=" "
+              placeholder="Jane Doe"
               required
               value={name}
               onChange={(event) => setName(event.target.value)}
@@ -54,7 +54,7 @@ export default function SubscribeForm({ searchParams }) {
             <input
               type="email"
               className="form-control"
-              placeholder=" "
+              placeholder="jane@example.com"
               required
               value={email}
               onChange={(event) => setEmail(event.target.value)}
@@ -67,7 +67,7 @@ export default function SubscribeForm({ searchParams }) {
             <input
               type="number"
               className="form-control"
-              placeholder=" "
+              placeholder="e.g. 300"
               min="1"
               step="0.01"
               required

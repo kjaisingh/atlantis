@@ -53,7 +53,7 @@ export default function SearchForm({ airports, onSearch, loading }) {
               type="text"
               className="form-control"
               list="airport-options"
-              placeholder=" "
+              placeholder="e.g. JFK"
               required
               value={origin}
               onChange={(event) => setOrigin(event.target.value)}
@@ -65,7 +65,7 @@ export default function SearchForm({ airports, onSearch, loading }) {
               type="text"
               className="form-control"
               list="airport-options"
-              placeholder=" "
+              placeholder="e.g. LHR"
               required
               value={destination}
               onChange={(event) => setDestination(event.target.value)}

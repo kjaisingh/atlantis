@@ -1,334 +1,41 @@
-:root {
-  --bs-primary: #ee0979;
-  --bs-primary-rgb: 238, 9, 121;
-  --bs-secondary: #ff6a00;
-  --bs-secondary-rgb: 255, 106, 0;
+@import "tailwindcss";
+
+@theme {
+  --font-display: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+
+  --color-brand-50: #fef1f7;
+  --color-brand-100: #fce3ef;
+  --color-brand-200: #f9c0da;
+  --color-brand-500: #ec1a78;
+  --color-brand-600: #d4106a;
+  --color-brand-700: #ad0a58;
+  --color-accent-500: #ff6a00;
 }
 
-/* Bootstrap 5.3 bakes .btn-primary's colors into component-scoped
-   --bs-btn-* variables at Bootstrap's own build time, so redeclaring
-   --bs-primary above doesn't retint it — override those explicitly. */
-.btn-primary {
-  --bs-btn-bg: var(--bs-primary);
-  --bs-btn-border-color: var(--bs-primary);
-  --bs-btn-hover-bg: #db086f;
-  --bs-btn-hover-border-color: #db086f;
-  --bs-btn-active-bg: #ca0867;
-  --bs-btn-active-border-color: #ca0867;
-  --bs-btn-disabled-bg: var(--bs-primary);
-  --bs-btn-disabled-border-color: var(--bs-primary);
-  --bs-btn-focus-shadow-rgb: var(--bs-primary-rgb);
+html {
+  scroll-behavior: smooth;
 }
 
-/* Results Table */
-.card {
-  margin-bottom: 100px;
+body {
+  font-family: var(--font-sans);
 }
 
-.table tr {
-  line-height: 50px;
+h1, h2, h3, h4 {
+  font-family: var(--font-display);
 }
 
-.table thead th {
-  vertical-align: bottom;
-  border-bottom: 2px solid #dee2e6;
-}
-
-.table th {
-  padding: 1rem;
-  vertical-align: top;
-  border-top: 1px solid #dee2e6;
-}
-
-.customcheckbox {
-  display: block;
-  position: relative;
-  padding-left: 24px;
-  font-weight: 100;
-  margin-bottom: 20px;
-  cursor: pointer;
-  font-size: 22px;
-  -webkit-user-select: none;
-  -moz-user-select: none;
-  -ms-user-select: none;
-  user-select: none;
-}
-
-/* Booking Form */
-.button-wrapper {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.wrapper {
-  max-width: 800px;
-  margin: 50px auto;
-}
-
-.wrapper form {
-  padding: 30px 50px;
-}
-
-.wrapper form .form-group {
-  position: relative;
-  padding-bottom: 0.5rem;
-}
-
-.wrapper form .option {
-  position: relative;
-  padding-left: 25px;
-  cursor: pointer;
-  display: block;
-}
-
-.wrapper form .option input {
-  display: none;
-}
-
-.wrapper form .checkmark {
-  position: absolute;
-  top: 4px;
-  left: 0;
-  height: 17px;
-  width: 17px;
-  background-color: #fff;
-  border: 1px solid #aaa;
-  border-radius: 50%;
-}
-
-.wrapper form .option input:checked~.checkmark:after {
-  display: block;
-}
-
-.wrapper form .option .checkmark:after {
-  content: "";
-  width: 7px;
-  height: 7px;
-  display: block;
-  border-radius: 50%;
-  background-color: #333;
-  position: absolute;
-  top: 48%;
-  left: 52%;
-  transform: translate(-50%, -50%) scale(0);
-  transition: 200ms ease-in-out 0s;
-}
-
-.wrapper form .option:hover input[type="radio"]~.checkmark {
-  background-color: #f4f4f4;
-}
-
-.wrapper form .option input[type="radio"]:checked~.checkmark {
-  background: #fff;
-  color: #fff;
-  transition: 300ms ease-in-out 0s;
-}
-
-.wrapper form .option input[type="radio"]:checked~.checkmark:after {
-  transform: translate(-50%, -50%) scale(1);
-  color: #fff;
-}
-
-.wrapper form a {
-  color: #333;
-}
-
-.wrapper form .form-control {
-  outline: none;
-  border: none;
-  border-bottom: 1px solid #dee2e6;
-  border-radius: 0;
-}
-
-.wrapper form .form-control:focus {
-  box-shadow: none;
-  border-bottom-color: var(--bs-primary);
-}
-
-.wrapper form input[type="text"]:focus::placeholder {
+.text-gradient {
+  background-image: linear-gradient(90deg, var(--color-brand-500), var(--color-accent-500));
+  -webkit-background-clip: text;
+  background-clip: text;
   color: transparent;
 }
 
-input[type="date"] {
+.bg-gradient-brand {
+  background-image: linear-gradient(90deg, var(--color-brand-500), var(--color-accent-500));
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator {
   cursor: pointer;
-}
-
-.wrapper form .label::after {
-  position: absolute;
-  top: 5px;
-  left: 0px;
-  font-size: 0.9rem;
-  margin: 0rem 0.4rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08rem;
-  font-weight: 600;
-  color: #999;
-  transition: all 0.2s ease-in-out;
-  transform: scale(0);
-}
-
-.wrapper form .label#from::after {
-  content: "From";
-}
-
-.wrapper form .label#to::after {
-  content: "To";
-}
-
-.wrapper form .label#depart::after {
-  content: "Depart Date";
-}
-
-.wrapper form .label#return::after {
-  content: "Return Date";
-}
-
-.wrapper form .label#psngr::after {
-  content: "Traveler(s)";
-}
-
-.wrapper form .label#name::after {
-  content: "Name";
-}
-
-.wrapper form .label#email::after {
-  content: "Email";
-}
-
-.wrapper form .label#prc::after {
-  content: "Price Threshold ($)";
-}
-
-.wrapper form input:focus~.label::after,
-.wrapper form input:not(:placeholder-shown)~.label::after {
-  top: -15px;
-  left: 0px;
-  transform: scale(1);
-}
-
-.margin {
-  margin: 2rem 0rem;
-}
-
-@media (max-width: 575.5px) {
-  .wrapper {
-    margin: 10px;
-  }
-
-  .wrapper form {
-    padding: 20px;
-  }
-
-  .margin {
-    margin: 0.2rem 0rem;
-  }
-}
-
-/* Navbar + Hero */
-.navbar-custom {
-  padding-top: 1rem;
-  padding-bottom: 1rem;
-  background-color: rgba(0, 0, 0, 0.7);
-}
-
-.navbar-custom .navbar-brand {
-  text-transform: uppercase;
-  font-size: 1rem;
-  letter-spacing: 0.1rem;
-  font-weight: 700;
-}
-
-.navbar-custom .navbar-nav .nav-item .nav-link {
-  text-transform: uppercase;
-  font-size: 0.8rem;
-  font-weight: 700;
-  letter-spacing: 0.1rem;
-}
-
-header.masthead {
-  position: relative;
-  overflow: hidden;
-  padding-top: calc(7rem + 72px);
-  padding-bottom: 7rem;
-  background: linear-gradient(0deg, #ff6a00 0%, #ee0979 100%);
-  background-repeat: no-repeat;
-  background-position: center center;
-  background-attachment: scroll;
-  background-size: cover;
-}
-
-header.masthead .masthead-content {
-  z-index: 1;
-  position: relative;
-}
-
-header.masthead .masthead-content .masthead-heading {
-  font-size: 4rem;
-}
-
-header.masthead .masthead-content .masthead-subheading {
-  font-size: 2rem;
-}
-
-header.masthead .bg-circle {
-  z-index: 0;
-  position: absolute;
-  border-radius: 100%;
-  background: linear-gradient(0deg, #ee0979 0%, #ff6a00 100%);
-}
-
-header.masthead .bg-circle-1 {
-  height: 90rem;
-  width: 90rem;
-  bottom: -55rem;
-  left: -55rem;
-}
-
-header.masthead .bg-circle-2 {
-  height: 50rem;
-  width: 50rem;
-  top: -25rem;
-  right: -25rem;
-}
-
-header.masthead .bg-circle-3 {
-  height: 20rem;
-  width: 20rem;
-  bottom: -10rem;
-  right: 5%;
-}
-
-header.masthead .bg-circle-4 {
-  height: 30rem;
-  width: 30rem;
-  top: -5rem;
-  right: 35%;
-}
-
-@media (min-width: 992px) {
-  header.masthead {
-    padding-top: calc(10rem + 55px);
-    padding-bottom: 10rem;
-  }
-
-  header.masthead .masthead-content .masthead-heading {
-    font-size: 6rem;
-  }
-
-  header.masthead .masthead-content .masthead-subheading {
-    font-size: 4rem;
-  }
-}
-
-/* Results row highlight (Bootstrap paints background-color on each td/th
-   directly, so the row-level rule alone never shows — target the cells) */
-tr.highlight-row > td {
-  background-color: #d6d3c9;
-}
-
-.spinner-wrapper {
-  display: flex;
-  justify-content: center;
-  padding: 4rem 0;
 }

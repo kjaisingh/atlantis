@@ -1,9 +1,8 @@
 export default function Spinner() {
   return (
-    <div className="spinner-wrapper">
-      <div className="spinner-border text-primary" role="status">
-        <span className="visually-hidden">Loading...</span>
-      </div>
+    <div role="status" className="flex justify-center py-10">
+      <div className="h-8 w-8 animate-spin rounded-full border-4 border-brand-100 border-t-brand-500" />
+      <span className="sr-only">Loading…</span>
     </div>
   );
 }

@@ -60,11 +60,21 @@ export async function fetchData(origin, zArray, departureDate, numAdults) {
  */
 export function filterData(itineraries, numAdults, dest) {
   const results = [];
+  const seenFlights = new Set();
   let directPutOnTop = false;
   const cities = lookupMap[dest] ?? [dest];
 
   for (const itinerary of itineraries) {
     const segments = itinerary.segments;
+
+    // Same physical flight(s) often reappear as several fare brands (basic/main/refundable) at
+    // different prices. Itineraries arrive price-sorted, so the first occurrence is the cheapest.
+    const flightKey = segments.map((s) => `${s.carrierCode}${s.flightNumber}`).join('-');
+    if (seenFlights.has(flightKey)) {
+      continue;
+    }
+    seenFlights.add(flightKey);
+
     const path = [segments[0].origin];
     const layovers = [];
     let destIndex = -1;

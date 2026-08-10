@@ -58,6 +58,6 @@ const port = Number(process.env.PORT || 3000);
 app.listen(port, () => {
   console.log(`Atlantis listening on port ${port}`);
   if (!db.isEnabled()) {
-    console.warn('[db] Supabase not configured — subscriptions are disabled.');
+    console.warn('[db] Supabase not configured - subscriptions are disabled.');
   }
 });

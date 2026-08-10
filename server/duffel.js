@@ -15,7 +15,7 @@ function buildRequest(slices, passengers) {
 
 const MAX_RATE_LIMIT_RETRIES = 3;
 
-// Caps concurrent in-flight requests across the whole process — shared by every
+// Caps concurrent in-flight requests across the whole process - shared by every
 // caller (outbound fan-out, inbound fan-out, direct lookups) so a round trip's
 // two directions can't each open their own pool on top of the other.
 const MAX_CONCURRENT_REQUESTS = 3;
@@ -40,7 +40,7 @@ function releaseSlot() {
 }
 
 // Duffel enforces a fixed-window request budget (this account: 10 per window,
-// reported via the ratelimit-* headers) rather than a concurrency cap — a burst
+// reported via the ratelimit-* headers) rather than a concurrency cap - a burst
 // of ~12 requests from a round trip blows the budget no matter how it's paced
 // unless we track remaining budget ourselves and pause before it hits zero.
 const rateState = { limit: null, remaining: null, resetAt: null };

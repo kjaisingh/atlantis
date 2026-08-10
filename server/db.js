@@ -10,7 +10,7 @@ const supabase = persistenceEnabled
 
 /**
  * Subscriptions are a best-effort convenience feature, not core functionality.
- * A flaky or misconfigured Supabase project must never block flight search —
+ * A flaky or misconfigured Supabase project must never block flight search -
  * every method here degrades to a fallback instead of throwing.
  */
 async function safeCall(action, fallback, run) {

@@ -54,7 +54,7 @@ export default function ResultsTable({ title, itineraries }) {
                   {itinerary.isHiddenCity && (
                     <p className="mt-2 flex items-start gap-1.5 rounded-lg bg-amber-50 px-2.5 py-1.5 text-xs text-amber-700">
                       <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                      Get off at {itinerary.layoverCity} — don't take the rest of this ticket.
+                      Get off at {itinerary.layoverCity} - don't take the rest of this ticket.
                     </p>
                   )}
                 </div>

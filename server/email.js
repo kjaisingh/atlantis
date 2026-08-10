@@ -47,7 +47,7 @@ export function sendPriceAlertEmail(subscription, itinerary) {
     subject: `Atlantis found a match: ${subscription.origin} → ${subscription.destination}`,
     heading: 'We found a flight under your price threshold!',
     body: `
-      ${itinerary.airline} — ${itinerary.path}<br>
+      ${itinerary.airline} - ${itinerary.path}<br>
       Departs ${itinerary.departureTime}, arrives ${itinerary.arrivalTime}<br>
       Price: $${itinerary.price} (threshold: $${subscription.price_threshold})<br>
       <a href="${itinerary.bookingLink}">Book on Kayak</a>

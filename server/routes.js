@@ -27,16 +27,29 @@ const airports = readFileSync(new URL('./data/airports.txt', import.meta.url), '
   .split('\n')
   .map((line) => line.trim())
   .filter(Boolean);
-const airportSet = new Set(airports);
 
 const airportNames = JSON.parse(
   readFileSync(new URL('./data/airport-names.json', import.meta.url), 'utf-8'),
 );
+const lookupMap = JSON.parse(
+  readFileSync(new URL('./data/lookup-map.json', import.meta.url), 'utf-8'),
+);
+const metroNames = JSON.parse(
+  readFileSync(new URL('./data/metro-names.json', import.meta.url), 'utf-8'),
+);
+
 const airportDirectory = airports.map((code) => ({
   code,
   city: airportNames[code]?.city ?? null,
   name: airportNames[code]?.name ?? null,
 }));
+const metroDirectory = Object.entries(lookupMap).map(([code, members]) => ({
+  code,
+  city: metroNames[code]?.city ?? null,
+  name: `All airports (${members.join(', ')})`,
+}));
+const searchableAirports = [...airportDirectory, ...metroDirectory];
+const airportSet = new Set([...airports, ...Object.keys(lookupMap)]);
 
 function isValidDate(value) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
@@ -56,7 +69,7 @@ function isReturnDateValid(departureDate, returnDate) {
 }
 
 router.get('/airports', (_req, res) => {
-  res.json(airportDirectory);
+  res.json(searchableAirports);
 });
 
 router.post('/search', searchLimiter, async (req, res) => {

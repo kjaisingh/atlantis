@@ -47,7 +47,7 @@ export default function App() {
           <>
             <Spinner />
             <p className="text-center text-sm text-slate-500">
-              Hidden-city searches check several flight combinations — this can take up to a minute.
+              Hidden-city searches check several flight combinations - this can take up to a minute.
             </p>
           </>
         )}

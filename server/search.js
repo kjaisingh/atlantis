@@ -12,25 +12,40 @@ const MAX_FANOUT_CANDIDATES = 4;
 
 /**
  * Returns one-way itineraries for origin -> dest, cheapest first.
- * Fans out across the cached hidden-city candidates for this pair (if any),
- * then filters each fan-out search down to itineraries that actually pass
- * through dest as a layover.
+ * origin/dest may be a metro code (lookup-map.json) covering several airports.
+ * Fans out across concrete-airport pairs and their cached hidden-city
+ * candidates (if any), then filters each search down to itineraries that
+ * actually pass through dest (or one of its metro members) as a layover.
  */
 export async function findAllOneWayFlights(origin, dest, date, numAdults) {
-  const cacheRow = cacheTable.find((entry) => entry.X === origin && entry.Y === dest);
+  const originAirports = lookupMap[origin] ?? [origin];
+  const destAirports = lookupMap[dest] ?? [dest];
+
+  // Pass 1: a direct request for every concrete origin/dest pair, so a metro
+  // search always covers every member airport at least once.
+  const requests = [];
+  for (const o of originAirports) {
+    for (const d of destAirports) {
+      requests.push({ origin: o, candidate: d });
+    }
+  }
+  // Pass 2: fill any remaining budget with each pair's cached hidden-city candidates.
+  for (const o of originAirports) {
+    for (const d of destAirports) {
+      const cacheRow = cacheTable.find((entry) => entry.X === o && entry.Y === d);
+      if (!cacheRow) continue;
+      const zCandidates = cacheRow.Z.filter((z) => z !== o && !destAirports.includes(z));
+      for (const z of zCandidates) {
+        requests.push({ origin: o, candidate: z });
+      }
+    }
+  }
+
+  const resultsList = await fetchData(requests.slice(0, MAX_FANOUT_CANDIDATES), date, numAdults);
 
   let offers = [];
-
-  if (cacheRow) {
-    const zCandidates = cacheRow.Z.filter((z) => z !== origin && z !== dest).slice(0, MAX_FANOUT_CANDIDATES - 1);
-    const candidates = [...zCandidates, dest];
-    const resultsList = await fetchData(origin, candidates, date, numAdults);
-    for (const offerRequest of resultsList) {
-      offers = offers.concat(filterJSONResult(offerRequest.offers, dest));
-    }
-  } else {
-    const directSearch = await duffelClient.oneWayLookup(origin, dest, date, numAdults);
-    offers = offers.concat(directSearch.offers);
+  for (const offerRequest of resultsList) {
+    offers = offers.concat(filterJSONResult(offerRequest.offers, dest));
   }
 
   let itineraries = offers.map((offer) => OneWayFilterItems(offer, 0));
@@ -39,9 +54,9 @@ export async function findAllOneWayFlights(origin, dest, date, numAdults) {
   return itineraries;
 }
 
-export async function fetchData(origin, zArray, departureDate, numAdults) {
+export async function fetchData(requests, departureDate, numAdults) {
   const results = await Promise.allSettled(
-    zArray.map((z) => duffelClient.oneWayLookup(origin, z, departureDate, numAdults)),
+    requests.map((r) => duffelClient.oneWayLookup(r.origin, r.candidate, departureDate, numAdults)),
   );
   return results
     .filter((result) => {
@@ -102,7 +117,7 @@ export function filterData(itineraries, numAdults, dest) {
       hour12: true,
     };
 
-    const isHiddenCity = segments[segments.length - 1].destination !== dest;
+    const isHiddenCity = !cities.includes(segments[segments.length - 1].destination);
 
     const entry = {
       airline: segments[0].carrierName,
@@ -122,7 +137,7 @@ export function filterData(itineraries, numAdults, dest) {
       arrivalTime: new Date(segments[destIndex].arrivalTime).toLocaleString('en-US', dateFormat),
     };
 
-    if (!directPutOnTop && segments[segments.length - 1].destination === dest) {
+    if (!directPutOnTop && cities.includes(segments[segments.length - 1].destination)) {
       results.unshift(entry);
       directPutOnTop = true;
     } else {
@@ -158,9 +173,10 @@ export function OneWayFilterItems(offer, sliceIndex) {
   };
 }
 
-/** Keeps only offers whose first slice actually routes through dest. */
+/** Keeps only offers whose first slice actually routes through dest (or one of its metro members). */
 export function filterJSONResult(offers, dest) {
+  const cities = lookupMap[dest] ?? [dest];
   return offers.filter((offer) =>
-    offer.slices[0].segments.some((segment) => segment.destination.iata_code === dest),
+    offer.slices[0].segments.some((segment) => cities.includes(segment.destination.iata_code)),
   );
 }

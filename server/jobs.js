@@ -43,23 +43,25 @@ export async function checkSubscriptions() {
         continue;
       }
 
+      let inbound = null;
       let totalPrice = parseFloat(outbound.price);
 
       if (subscription.return_date) {
-        const inbound = await cheapestItinerary(
+        inbound = await cheapestItinerary(
           subscription.destination,
           subscription.origin,
           subscription.return_date,
           subscription.num_travelers,
         );
-        if (inbound) {
-          totalPrice += parseFloat(inbound.price);
+        if (!inbound) {
+          continue;
         }
+        totalPrice += parseFloat(inbound.price);
       }
 
       if (totalPrice <= subscription.price_threshold) {
         matched += 1;
-        await sendPriceAlertEmail(subscription, outbound);
+        await sendPriceAlertEmail(subscription, outbound, inbound, totalPrice);
         await db.markNotified(subscription.id);
       }
     } catch (err) {

@@ -41,16 +41,26 @@ async function sendEmail({ to, subject, heading, body }) {
   });
 }
 
-export function sendPriceAlertEmail(subscription, itinerary) {
+function legSummary(itinerary, label) {
+  return `
+    <strong>${label}</strong>: ${itinerary.airline} - ${itinerary.path}<br>
+    Departs ${itinerary.departureTime}, arrives ${itinerary.arrivalTime}<br>
+    <a href="${itinerary.bookingLink}">Book on Kayak</a>
+  `;
+}
+
+export function sendPriceAlertEmail(subscription, outbound, inbound, totalPrice) {
+  const legs = inbound
+    ? `${legSummary(outbound, 'Outbound')}<br>${legSummary(inbound, 'Return')}`
+    : legSummary(outbound, 'Flight');
+
   return sendEmail({
     to: subscription.email,
     subject: `Atlantis found a match: ${subscription.origin} → ${subscription.destination}`,
     heading: 'We found a flight under your price threshold!',
     body: `
-      ${itinerary.airline} - ${itinerary.path}<br>
-      Departs ${itinerary.departureTime}, arrives ${itinerary.arrivalTime}<br>
-      Price: $${itinerary.price} (threshold: $${subscription.price_threshold})<br>
-      <a href="${itinerary.bookingLink}">Book on Kayak</a>
+      ${legs}<br>
+      Total price: $${totalPrice} (threshold: $${subscription.price_threshold})
     `,
   });
 }

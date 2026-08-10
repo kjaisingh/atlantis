@@ -62,7 +62,7 @@ message when exceeded.
 
 
 ## Tech Stack
-- Frontend: React + Vite.
+- Frontend: React + Vite, styled with Tailwind CSS and [lucide-react](https://lucide.dev) icons.
 - Backend: Node.js + Express (ESM, stateless JSON API).
 - Flight data: [Duffel](https://duffel.com) API.
 - Database: Supabase Postgres (subscriptions only — optional).
@@ -107,6 +107,8 @@ http://localhost:5173
 - `npm run build` — production frontend build, output to `dist/`.
 - `npm start` — run the production server, which serves `dist/` and the JSON API from one process.
 - `npm run preview` — serve the built frontend locally without the backend, for a quick static check.
+- `node scripts/smoke-test.mjs` — Playwright script that drives a real search end-to-end (desktop +
+  mobile) against a running instance and screenshots each step. Point it elsewhere with `SMOKE_URL`.
 
 
 ## Production Build
@@ -130,6 +132,10 @@ The server runs on `PORT` (default `3000`) and serves the built frontend from `d
 - Start Command: `npm start`.
 - Runtime: Node 18+.
 - Set env vars per the table below.
+
+### Continuous integration
+`.github/workflows/build.yml` runs `npm ci && npm run build` on every push and pull request against
+`main`, so a build-breaking change gets flagged in CI before it reaches Render.
 
 ### Scheduled subscription checks
 `.github/workflows/check-subscriptions.yml` calls `POST /api/jobs/check-subscriptions` on a daily

@@ -35,6 +35,7 @@ app.get('/api/health', (_req, res) => {
 });
 
 app.use('/api', routes);
+app.use('/api', (_req, res) => res.status(404).json({ error: 'Not found.' }));
 
 const distDir = path.resolve(__dirname, '../dist');
 app.use(express.static(distDir));

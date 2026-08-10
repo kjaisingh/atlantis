@@ -92,10 +92,14 @@ export function filterData(itineraries, numAdults, dest) {
       hour12: true,
     };
 
+    const isHiddenCity = segments[segments.length - 1].destination !== dest;
+
     const entry = {
       airline: segments[0].carrierName,
       path: path.join(' → '),
       price: itinerary.price,
+      isHiddenCity,
+      layoverCity: isHiddenCity ? dest : null,
       bookingLink: getBookingLink(
         segments[0].origin,
         segments[segments.length - 1].destination,

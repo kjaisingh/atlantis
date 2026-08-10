@@ -29,6 +29,15 @@ const airports = readFileSync(new URL('./data/airports.txt', import.meta.url), '
   .filter(Boolean);
 const airportSet = new Set(airports);
 
+const airportNames = JSON.parse(
+  readFileSync(new URL('./data/airport-names.json', import.meta.url), 'utf-8'),
+);
+const airportDirectory = airports.map((code) => ({
+  code,
+  city: airportNames[code]?.city ?? null,
+  name: airportNames[code]?.name ?? null,
+}));
+
 function isValidDate(value) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
     return false;
@@ -47,7 +56,7 @@ function isReturnDateValid(departureDate, returnDate) {
 }
 
 router.get('/airports', (_req, res) => {
-  res.json(airports);
+  res.json(airportDirectory);
 });
 
 router.post('/search', searchLimiter, async (req, res) => {

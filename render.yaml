@@ -29,4 +29,4 @@ services:
       - key: SMTP_FROM
         sync: false
       - key: JOB_SECRET
-        generateValue: true
+        sync: false

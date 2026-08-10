@@ -22,7 +22,7 @@ export async function findAllOneWayFlights(origin, dest, date, numAdults) {
   let offers = [];
 
   if (cacheRow) {
-    const zCandidates = cacheRow.Z.filter((z) => z !== origin).slice(0, MAX_FANOUT_CANDIDATES - 1);
+    const zCandidates = cacheRow.Z.filter((z) => z !== origin && z !== dest).slice(0, MAX_FANOUT_CANDIDATES - 1);
     const candidates = [...zCandidates, dest];
     const resultsList = await fetchData(origin, candidates, date, numAdults);
     for (const offerRequest of resultsList) {
@@ -40,7 +40,17 @@ export async function findAllOneWayFlights(origin, dest, date, numAdults) {
 }
 
 export async function fetchData(origin, zArray, departureDate, numAdults) {
-  return Promise.all(zArray.map((z) => duffelClient.oneWayLookup(origin, z, departureDate, numAdults)));
+  const results = await Promise.allSettled(
+    zArray.map((z) => duffelClient.oneWayLookup(origin, z, departureDate, numAdults)),
+  );
+  return results
+    .filter((result) => {
+      if (result.status === 'rejected') {
+        console.error('[search] fan-out request failed:', result.reason?.message ?? result.reason);
+      }
+      return result.status === 'fulfilled';
+    })
+    .map((result) => result.value);
 }
 
 /**

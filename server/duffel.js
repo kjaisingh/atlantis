@@ -115,13 +115,3 @@ export function oneWayLookup(origin, destination, departureDate, passengers) {
     passengers,
   );
 }
-
-export function roundTripLookup(origin, destination, departureDate, returnDate, passengers) {
-  return requestOffers(
-    [
-      { origin, destination, departure_date: departureDate },
-      { origin: destination, destination: origin, departure_date: returnDate },
-    ],
-    passengers,
-  );
-}

@@ -10,12 +10,6 @@ for exactly these opportunities: give it a real origin and destination, and it c
 against fares to every other airport in its cache that happens to route through your destination
 first.
 
-**A note on legality:** hidden-city ticketing (also called "point-beyond" ticketing) is not illegal,
-but it usually violates an airline's contract of carriage. Airlines have been known to cancel the
-rest of a ticket, claw back frequent-flyer miles, or ban repeat offenders — especially for travelers
-who do it often. This is a research tool, not booking advice: use it at your own risk. Atlantis
-surfaces the itineraries and links out to book them elsewhere; it never books anything itself.
-
 
 ## Overview
 - **Search**: enter an origin, destination, date(s), and traveler count. Atlantis checks the direct

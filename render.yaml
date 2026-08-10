@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: atlantis
+    name: Atlantis
     env: node
     plan: free
     autoDeploy: true

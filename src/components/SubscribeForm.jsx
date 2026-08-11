@@ -51,7 +51,7 @@ export default function SubscribeForm({ searchParams }) {
           We'll email you if this route drops below your target price.
         </p>
 
-        <div className="mt-5 grid gap-4 sm:grid-cols-2">
+        <div className="mt-5 grid gap-4">
           <div>
             <label htmlFor="subscribeName" className="mb-1.5 block text-sm font-medium text-slate-700">
               Name

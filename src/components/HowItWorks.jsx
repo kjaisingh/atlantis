@@ -1,4 +1,4 @@
-import { AlertCircle, Search, Ticket, Wallet } from 'lucide-react';
+import { Search, Ticket, Wallet } from 'lucide-react';
 
 const steps = [
   {
@@ -9,7 +9,7 @@ const steps = [
   {
     icon: Ticket,
     title: 'You book the cheaper, longer ticket',
-    body: 'Your real destination is the layover city. You just get off there and skip the final leg.',
+    body: 'Your real destination is the layover city. You just get off there, skip the final leg, and skip checked bags too.',
   },
   {
     icon: Wallet,
@@ -40,15 +40,6 @@ export default function HowItWorks() {
               <p className="mt-2 text-sm text-slate-600">{step.body}</p>
             </div>
           ))}
-        </div>
-
-        <div className="mx-auto mt-10 flex max-w-2xl items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-          <p>
-            Book one-way, skip checked bags, and don't take the return leg of a round trip after
-            leaving early. Airlines' fare rules can flag or cancel the rest of an itinerary if you
-            skip a segment.
-          </p>
         </div>
       </div>
     </section>

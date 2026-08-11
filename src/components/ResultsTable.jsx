@@ -1,4 +1,4 @@
-import { AlertTriangle, ArrowRight, PlaneTakeoff } from 'lucide-react';
+import { AlertTriangle, ArrowRight, PlaneTakeoff, TrendingDown } from 'lucide-react';
 
 function formatPrice(value) {
   const numeric = Number(value);
@@ -17,13 +17,30 @@ export default function ResultsTable({ title, itineraries }) {
     );
   }
 
+  const prices = itineraries.map((itinerary) => Number(itinerary.price));
+  const cheapestPrice = Math.min(...prices);
+  const cheapestIndex = prices.indexOf(cheapestPrice);
+  const directPrices = itineraries
+    .filter((itinerary) => itinerary.nonstop)
+    .map((itinerary) => Number(itinerary.price));
+  const directPrice = directPrices.length > 0 ? Math.min(...directPrices) : null;
+  const savings = directPrice !== null ? directPrice - cheapestPrice : 0;
+
   return (
     <div className="mt-8">
       <h3 className="text-lg font-semibold text-slate-900">{title}</h3>
+
+      {directPrice !== null && savings > 0 && (
+        <div className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-brand-50 px-3 py-1.5 text-sm font-semibold text-brand-600">
+          <TrendingDown className="h-4 w-4" />
+          Save {formatPrice(savings)} vs the {formatPrice(directPrice)} direct fare
+        </div>
+      )}
+
       <div className="mt-3 space-y-3">
         {itineraries.map((itinerary, index) => {
-          const isNonstop = itinerary.path.split(' → ').length === 2;
-          const isCheapest = index === 0;
+          const isCheapest = index === cheapestIndex;
+          const isDirectAnchor = itinerary.nonstop && !isCheapest;
 
           return (
             <a
@@ -45,13 +62,18 @@ export default function ResultsTable({ title, itineraries }) {
                         Cheapest
                       </span>
                     )}
-                    {isNonstop && (
+                    {itinerary.nonstop && (
                       <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-600">
                         Nonstop
                       </span>
                     )}
+                    {isDirectAnchor && (
+                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-500">
+                        Direct
+                      </span>
+                    )}
                   </div>
-                  <p className="mt-1.5 flex items-center gap-1.5 text-sm text-slate-500">
+                  <p className="mt-1.5 flex items-center gap-1.5 font-mono text-sm text-slate-500">
                     <ArrowRight className="h-3.5 w-3.5 shrink-0" />
                     {itinerary.path}
                   </p>

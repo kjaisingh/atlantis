@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import compression from 'compression';
 import express from 'express';
 import helmet from 'helmet';
 import 'dotenv/config';
@@ -22,6 +23,7 @@ app.use(
     },
   }),
 );
+app.use(compression());
 app.use(express.json());
 app.use((err, _req, res, next) => {
   if (err.type === 'entity.parse.failed') {
@@ -38,8 +40,21 @@ app.use('/api', routes);
 app.use('/api', (_req, res) => res.status(404).json({ error: 'Not found.' }));
 
 const distDir = path.resolve(__dirname, '../dist');
-app.use(express.static(distDir));
-app.get('*', (_req, res) => res.sendFile(path.join(distDir, 'index.html')));
+app.use(
+  express.static(distDir, {
+    maxAge: '1y',
+    immutable: true,
+    setHeaders: (res, filePath) => {
+      if (path.basename(filePath) === 'index.html') {
+        res.set('Cache-Control', 'no-cache');
+      }
+    },
+  }),
+);
+app.get('*', (_req, res) => {
+  res.set('Cache-Control', 'no-cache');
+  res.sendFile(path.join(distDir, 'index.html'));
+});
 
 app.use((err, _req, res, _next) => {
   console.error('[server] unhandled error:', err);

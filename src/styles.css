@@ -39,3 +39,15 @@ h1, h2, h3, h4 {
 input[type="date"]::-webkit-calendar-picker-indicator {
   cursor: pointer;
 }
+
+::placeholder {
+  color: #64748b;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *:not(.animate-spin, .animate-spin *) {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

@@ -14,7 +14,7 @@ const steps = [
   {
     icon: Wallet,
     title: 'You pocket the difference',
-    body: 'Same seat, same airline, often the same day - for less than the "obvious" ticket would cost.',
+    body: 'Same seat, same airline, often the same day. All for less than the "obvious" ticket would cost.',
   },
 ];
 
@@ -35,7 +35,7 @@ export default function HowItWorks() {
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-50 text-brand-600">
                 <step.icon className="h-5 w-5" />
               </div>
-              <p className="mt-4 text-xs font-semibold text-slate-400">Step {index + 1}</p>
+              <p className="mt-4 text-xs font-semibold text-slate-500">Step {index + 1}</p>
               <h3 className="mt-1 text-base font-semibold text-slate-900">{step.title}</h3>
               <p className="mt-2 text-sm text-slate-600">{step.body}</p>
             </div>
@@ -46,7 +46,7 @@ export default function HowItWorks() {
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
           <p>
             Book one-way, skip checked bags, and don't take the return leg of a round trip after
-            leaving early - airlines' fare rules can flag or cancel the rest of an itinerary if you
+            leaving early. Airlines' fare rules can flag or cancel the rest of an itinerary if you
             skip a segment.
           </p>
         </div>

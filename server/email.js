@@ -21,7 +21,7 @@ const transporter = hasSmtp
 function buildEmail({ heading, body }) {
   return `
     <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
-      <h2 style="color: #ee0979;">${heading}</h2>
+      <h2 style="color: #ec1a78;">${heading}</h2>
       <p>${body}</p>
       <p style="color: #888; font-size: 12px;">Sent by Atlantis</p>
     </div>
@@ -43,7 +43,7 @@ async function sendEmail({ to, subject, heading, body }) {
 
 function legSummary(itinerary, label) {
   return `
-    <strong>${label}</strong>: ${itinerary.airline} - ${itinerary.path}<br>
+    <strong>${label}</strong>: ${itinerary.airline}, ${itinerary.path}<br>
     Departs ${itinerary.departureTime}, arrives ${itinerary.arrivalTime}<br>
     <a href="${itinerary.bookingLink}">Book on Kayak</a>
   `;

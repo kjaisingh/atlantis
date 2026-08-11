@@ -68,6 +68,18 @@ function isReturnDateValid(departureDate, returnDate) {
   return new Date(`${returnDate}T00:00:00`) >= new Date(`${departureDate}T00:00:00`);
 }
 
+// Pins the first true nonstop as a price anchor at the top of the list, so a hidden-city
+// savings claim is always compared against a real nonstop when one exists.
+export function pinNonstopFirst(itineraries) {
+  const index = itineraries.findIndex((itinerary) => itinerary.nonstop);
+  if (index <= 0) {
+    return itineraries;
+  }
+  const [nonstop] = itineraries.splice(index, 1);
+  itineraries.unshift(nonstop);
+  return itineraries;
+}
+
 router.get('/airports', (_req, res) => {
   res.json(searchableAirports);
 });
@@ -101,9 +113,9 @@ router.post('/search', searchLimiter, async (req, res) => {
       returnDate ? findAllOneWayFlights(destination, origin, returnDate, numTravelers) : null,
     ]);
 
-    const response = { outbound: outbound.slice(0, 10) };
+    const response = { outbound: pinNonstopFirst(outbound.slice(0, 10)) };
     if (inbound) {
-      response.inbound = inbound.slice(0, 10);
+      response.inbound = pinNonstopFirst(inbound.slice(0, 10));
     }
 
     res.json(response);
@@ -127,8 +139,11 @@ router.post('/subscribe', subscribeLimiter, async (req, res) => {
   const numTravelers = Number(travelers);
   const threshold = Number(priceThreshold);
 
-  if (!name || !email || !/^\S+@\S+\.\S+$/.test(email)) {
+  if (typeof name !== 'string' || typeof email !== 'string' || !name || !email || !/^\S+@\S+\.\S+$/.test(email)) {
     return res.status(400).json({ error: 'A valid name and email are required.' });
+  }
+  if (name.length > 120 || email.length > 254) {
+    return res.status(400).json({ error: 'Name or email is too long.' });
   }
   if (!airportSet.has(origin) || !airportSet.has(destination)) {
     return res.status(400).json({ error: 'Unknown origin or destination airport code.' });

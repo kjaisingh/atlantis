@@ -144,7 +144,7 @@ export default function SearchForm({ airports, onSearch, loading }) {
 
         <button
           type="submit"
-          disabled={loading}
+          disabled={loading || !origin || !destination}
           className="mt-6 w-full rounded-xl bg-gradient-brand py-3 text-sm font-semibold text-white shadow-lg shadow-brand-200 transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {loading ? 'Searching…' : 'Search flights'}

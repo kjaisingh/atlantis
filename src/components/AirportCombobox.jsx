@@ -60,7 +60,7 @@ export default function AirportCombobox({ label, value, onChange, airports, plac
       setHighlighted((i) => (i - 1 + matches.length) % matches.length);
     } else if (event.key === 'Enter') {
       event.preventDefault();
-      selectAirport(matches[highlighted]);
+      if (matches[highlighted]) selectAirport(matches[highlighted]);
     } else if (event.key === 'Escape') {
       setOpen(false);
     }
@@ -77,8 +77,10 @@ export default function AirportCombobox({ label, value, onChange, airports, plac
           id={inputId}
           type="text"
           role="combobox"
-          aria-expanded={open}
+          aria-autocomplete="list"
+          aria-expanded={open && matches.length > 0}
           aria-controls={listboxId}
+          aria-activedescendant={open && matches.length > 0 ? `${listboxId}-opt-${highlighted}` : undefined}
           autoComplete="off"
           value={query}
           onChange={handleInputChange}
@@ -95,7 +97,7 @@ export default function AirportCombobox({ label, value, onChange, airports, plac
           className="absolute z-20 mt-1.5 w-full max-h-64 overflow-auto rounded-xl border border-slate-200 bg-white py-1 shadow-lg"
         >
           {matches.map((airport, index) => (
-            <li key={airport.code} role="option" aria-selected={index === highlighted}>
+            <li key={airport.code} id={`${listboxId}-opt-${index}`} role="option" aria-selected={index === highlighted}>
               <button
                 type="button"
                 onMouseDown={(e) => e.preventDefault()}

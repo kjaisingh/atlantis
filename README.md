@@ -3,28 +3,29 @@
 
 Atlantis is a hidden-city flight search tool: it finds itineraries where the airport you actually want to fly to is just a layover on a *cheaper* ticket to somewhere further away.
 
-Here's the trick it's built around. Airlines usually price a one-stop itinerary lower than the non-stop leg buried inside it - a ticket from JFK to ORD with a layover in DTW can cost less than a ticket straight from JFK to DTW. If DTW was your real destination all along, you book the JFK→ORD fare, get off at the layover, and walk away without ever boarding the second flight. Atlantis searches for exactly these opportunities: give it a real origin and destination, and it checks the direct fare against fares to every other airport in its cache that happens to route through your destination first.
+Here's the trick it's built around. Airlines usually price a one-stop itinerary lower than the nonstop leg buried inside it: a ticket from JFK to ORD with a layover in DTW can cost less than a ticket straight from JFK to DTW. If DTW was your real destination all along, you book the JFK→ORD fare, get off at the layover, and walk away without ever boarding the second flight. Atlantis searches for exactly these opportunities: give it a real origin and destination, and it checks the direct fare against fares to every other airport in its cache that happens to route through your destination first.
 
 ## Overview
 - **Search**: enter an origin, destination, date(s), and traveler count. Atlantis checks the direct fare to your real destination, then cross-references its cache of routes to find every other airport that's reachable through your destination as a layover, and prices out a ticket to each one.
-- **Compare**: results come back sorted cheapest-first, with the direct-to-destination fare always pinned at the top of the list so you can see at a glance exactly how much a hidden-city option would save - or whether it's not worth the risk this time.
-- **Book**: each result links out to a matching Kayak search pre-filled with the right route and dates. Atlantis is a search tool, not a travel agent - it never touches payment or booking.
-- **Subscribe**: found a route you're watching but the price isn't there yet? Leave your email, a route, and a price threshold, and a scheduled job re-checks it periodically. The moment a matching fare under your threshold appears, you get an email - no need to keep the tab open.
+- **Compare**: results come back sorted cheapest-first. When a nonstop to your real destination exists, it's pinned at the top as a price anchor, so you can see at a glance how much a hidden-city option would save, or whether it's not worth the risk this time.
+- **Book**: each result links out to a matching Kayak search pre-filled with the right route and dates. Atlantis is a search tool, not a travel agent: it never touches payment or booking.
+- **Subscribe**: found a route you're watching but the price isn't there yet? Leave your email, a route, and a price threshold, and a scheduled job re-checks it periodically. The moment a matching fare under your threshold appears, you get an email, no need to keep the tab open.
 
 ## How It Works
-Duffel's flight search API only answers "what does this exact origin→destination itinerary cost" - it has no concept of hidden-city fares on its own. Atlantis builds that on top:
+Duffel's flight search API only answers "what does this exact origin→destination itinerary cost." It has no concept of hidden-city fares on its own. Atlantis builds that on top:
 
-1. A precomputed cache (`server/data/cache-table.json` + `lookup-map.json`) maps each origin airport to a shortlist of destinations that are known to have flights routing through it as a layover - roughly 600 origin airports and ~6,000 candidate routes in total.
+1. A precomputed cache (`server/data/cache-table.json` + `lookup-map.json`) maps each origin airport to a shortlist of destinations that are known to have flights routing through it as a layover, roughly 600 origin airports and ~6,000 candidate routes in total.
 2. A search looks up the requested origin in that cache, then fires off up to 4 Duffel `offer_request`s per direction: one for the direct route to your destination, plus up to 3 of the cache's candidate hidden-city destinations for that origin. That cap keeps a full round trip (both directions) comfortably under Duffel's rate-limit window without a wait in the common case.
-3. Each result is normalized to a common shape (segments, layovers, price, cabin), the metro-area aliases in the destination are resolved so, say, all of London's airports count as the same city, and everything is sorted by price with the direct fare always surfaced first.
-4. Round trips run this whole process twice - once per direction - and pair up outbound/inbound results independently rather than cross-producing every combination.
+3. Each result is normalized to a common shape (segments, layovers, price, cabin), the metro-area aliases in the destination are resolved so, say, all of London's airports count as the same city, and everything is sorted by price, with the nonstop fare (when one exists) pinned at the top as a price anchor.
+4. Round trips run this whole process twice, once per direction, and pair up outbound/inbound results independently rather than cross-producing every combination.
 
-Duffel enforces a fixed-window request budget on this account (10 requests per window), reported via its `ratelimit-*` response headers rather than a hard concurrency cap. Atlantis tracks that budget live off those headers: requests run up to 3 at a time rather than one-by-one, but pause automatically whenever the tracked budget hits zero until the window resets. A 429 response is still a safety net - it triggers a jittered retry (up to 3 attempts) keyed off Duffel's `ratelimit-reset` header rather than a blind fixed delay.
+Duffel enforces a fixed-window request budget on this account (10 requests per window), reported via its `ratelimit-*` response headers rather than a hard concurrency cap. Atlantis tracks that budget live off those headers: requests run up to 3 at a time rather than one-by-one, but pause automatically whenever the tracked budget hits zero until the window resets. A 429 response is still a safety net: it triggers a jittered retry (up to 3 attempts) keyed off Duffel's `ratelimit-reset` header rather than a blind fixed delay.
 
 Atlantis's own API also rate-limits per client IP, independent of Duffel's: `/api/search` allows 10 requests per minute, `/api/subscribe` allows 20 per hour. Both return a 429 with a plain-English message when exceeded.
 
 ## Known Limitations
-- **Subscriptions and email are best-effort.** If their env vars are omitted or misconfigured, flight search keeps working - subscribing just isn't available; without Supabase configured, `/api/subscribe` returns a clean "not configured" message, and without SMTP configured, emails are logged to the console instead of sent.
+- **Subscriptions and email are best-effort.** If their env vars are omitted or misconfigured, flight search keeps working, subscribing just isn't available: without Supabase configured, `/api/subscribe` returns a clean "not configured" message, and without SMTP configured, emails are logged to the console instead of sent.
+- **Two `npm audit` advisories.** Both are in the Vite dev-server toolchain (build-time only, not shipped to production); fixing them needs a Vite major-version bump, tracked separately.
 
 ## Feature Backlog
 - Expand the hidden-city candidate cache beyond its current ~600 origin airports.
@@ -36,7 +37,7 @@ Atlantis's own API also rate-limits per client IP, independent of Duffel's: `/ap
 - **Frontend**: React + Vite, styled with Tailwind CSS and [lucide-react](https://lucide.dev) icons
 - **Backend**: Node.js + Express (ESM, stateless JSON API)
 - **Flight data**: [Duffel](https://duffel.com) API
-- **Database**: Supabase (PostgreSQL, optional - subscriptions only, see [Known Limitations](#known-limitations))
+- **Database**: Supabase (PostgreSQL, optional, subscriptions only, see [Known Limitations](#known-limitations))
 - **Email**: SMTP via Nodemailer (optional)
 - **Scheduled jobs**: GitHub Actions, calling a secret-guarded API endpoint
 - **Deployment**: Render
@@ -50,7 +51,7 @@ Atlantis's own API also rate-limits per client IP, independent of Duffel's: `/ap
    ```bash
    cp .env.example .env
    ```
-3. Sign up for a free account at [duffel.com](https://duffel.com) and grab an API token from your workspace's developer settings. Duffel issues both a `duffel_test_...` sandbox token (mock offers, no cost, good for kicking the tires) and a `duffel_live_...` token (real airline offers, requires account verification). Either works - paste it into `.env` as `DUFFEL_API_KEY`. Everything else is optional - see [Environment Variables](#environment-variables) for what each one unlocks.
+3. Sign up for a free account at [duffel.com](https://duffel.com) and grab an API token from your workspace's developer settings. Duffel issues both a `duffel_test_...` sandbox token (mock offers, no cost, good for kicking the tires) and a `duffel_live_...` token (real airline offers, requires account verification). Either works: paste it into `.env` as `DUFFEL_API_KEY`. Everything else is optional, see [Environment Variables](#environment-variables) for what each one unlocks.
 4. Start backend + frontend.
    ```bash
    npm run dev
@@ -61,16 +62,17 @@ Atlantis's own API also rate-limits per client IP, independent of Duffel's: `/ap
    ```
 
 ## Scripts
-- `npm run dev` - run the Express API and the Vite dev server together, with the frontend proxying `/api` requests to the backend.
-- `npm run dev:server` - just the backend, auto-restarting on change via nodemon.
-- `npm run dev:client` - just the Vite dev server.
-- `npm run build` - production frontend build, output to `dist/`.
-- `npm start` - run the production server, which serves `dist/` and the JSON API from one process.
-- `npm run preview` - serve the built frontend locally without the backend, for a quick static check.
-- `node scripts/smoke-test.mjs` - Playwright script that drives a real search end-to-end (desktop + mobile) against a running instance and screenshots each step. Point it elsewhere with `SMOKE_URL`.
+- `npm run dev`: run the Express API and the Vite dev server together, with the frontend proxying `/api` requests to the backend.
+- `npm run dev:server`: just the backend, auto-restarting on change via nodemon.
+- `npm run dev:client`: just the Vite dev server.
+- `npm run build`: production frontend build, output to `dist/`.
+- `npm start`: run the production server, which serves `dist/` and the JSON API from one process.
+- `npm run preview`: serve the built frontend locally without the backend, for a quick static check.
+- `npm test`: backend unit tests via Node's built-in test runner.
+- `node scripts/smoke-test.mjs`: Playwright script that drives a real search end-to-end (desktop + mobile) against a running instance and screenshots each step. Point it elsewhere with `SMOKE_URL`.
 
 ## Testing & CI
-`node scripts/smoke-test.mjs` drives a real search end-to-end against a running instance. [`.github/workflows/build.yml`](.github/workflows/build.yml) runs `npm ci && npm run build` on every push and pull request to `main`, so a build-breaking change gets flagged in CI before it reaches Render.
+`npm test` covers dedup, hidden-city classification, nonstop pinning, and booking-link shape with synthetic data (no live Duffel calls). `node scripts/smoke-test.mjs` drives a real search end-to-end against a running instance. [`.github/workflows/build.yml`](.github/workflows/build.yml) runs `npm ci`, `npm run build`, and `npm test` on every push and pull request to `main`, so a build- or logic-breaking change gets flagged in CI before it reaches Render.
 
 ## Deployment
 
@@ -95,8 +97,8 @@ Atlantis's own API also rate-limits per client IP, independent of Duffel's: `/ap
 ## Environment Variables
 Full defaults and comments are in [`.env.example`](.env.example).
 
-- `PORT` - backend port (Render sets this automatically).
-- `DUFFEL_API_KEY` - **required**. Flight search returns nothing without it. A `duffel_test_...` key works for local development against mock data; a `duffel_live_...` key returns real airline offers.
-- `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` - Supabase **project** URL and server-only `service_role` key (Settings → API). Run `supabase/schema.sql` against your project first. Optional, see [Known Limitations](#known-limitations).
-- `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` / `SMTP_FROM` - SMTP credentials for subscription price-alert emails (a Gmail app password works). Optional, see [Known Limitations](#known-limitations).
-- `JOB_SECRET` - shared secret required in the `x-job-secret` header to call `POST /api/jobs/check-subscriptions`. Only needed if you're using subscriptions.
+- `PORT`: backend port (Render sets this automatically).
+- `DUFFEL_API_KEY`: **required**. Flight search returns nothing without it. A `duffel_test_...` key works for local development against mock data; a `duffel_live_...` key returns real airline offers.
+- `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY`: Supabase **project** URL and server-only `service_role` key (Settings → API). Run `supabase/schema.sql` against your project first. Optional, see [Known Limitations](#known-limitations).
+- `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` / `SMTP_FROM`: SMTP credentials for subscription price-alert emails (a Gmail app password works). Optional, see [Known Limitations](#known-limitations).
+- `JOB_SECRET`: shared secret required in the `x-job-secret` header to call `POST /api/jobs/check-subscriptions`. Only needed if you're using subscriptions.

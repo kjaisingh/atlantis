@@ -84,6 +84,9 @@ export function filterData(itineraries, numAdults, dest) {
 
     // Same physical flight(s) often reappear as several fare brands (basic/main/refundable) at
     // different prices. Itineraries arrive price-sorted, so the first occurrence is the cheapest.
+    // Two nonstops at the same price but different departure times are distinct flights with
+    // distinct flight numbers, so they get distinct keys here and both survive — intentional,
+    // not a dedup gap.
     const flightKey = segments.map((s) => `${s.carrierCode}${s.flightNumber}`).join('-');
     if (seenFlights.has(flightKey)) {
       continue;
@@ -125,6 +128,7 @@ export function filterData(itineraries, numAdults, dest) {
       price: itinerary.price,
       isHiddenCity,
       layoverCity: isHiddenCity ? dest : null,
+      nonstop: segments.length === 1,
       bookingLink: getBookingLink(
         segments[0].origin,
         segments[segments.length - 1].destination,
@@ -158,6 +162,7 @@ export function OneWayFilterItems(offer, sliceIndex) {
   const slice = offer.slices[sliceIndex];
   return {
     price: offer.total_amount,
+    currency: offer.total_currency,
     fareType: slice.fare_brand_name,
     totalDuration: slice.duration,
     segments: slice.segments.map((segment) => ({

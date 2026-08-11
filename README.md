@@ -7,7 +7,7 @@ Here's the trick it's built around. Airlines usually price a one-stop itinerary 
 
 ## Overview
 - **Search**: enter an origin, destination, date(s), and traveler count. Atlantis checks the direct fare to your real destination, then cross-references its cache of routes to find every other airport that's reachable through your destination as a layover, and prices out a ticket to each one.
-- **Compare**: results come back sorted cheapest-first. When a nonstop to your real destination exists, it's pinned at the top as a price anchor, so you can see at a glance how much a hidden-city option would save, or whether it's not worth the risk this time.
+- **Compare**: results come back sorted cheapest-first. When a nonstop to your real destination exists, it's pinned at the top as a price anchor and badged "Direct," so you can see at a glance how much a hidden-city option would save, or whether it's not worth the risk this time. A savings banner at the top of the list does that math for you ("Save $X vs the $Y direct fare") whenever a cheaper hidden-city option beats the nonstop baseline.
 - **Book**: each result links out to a matching Kayak search pre-filled with the right route and dates. Atlantis is a search tool, not a travel agent: it never touches payment or booking.
 - **Subscribe**: found a route you're watching but the price isn't there yet? Leave your email, a route, and a price threshold, and a scheduled job re-checks it periodically. The moment a matching fare under your threshold appears, you get an email, no need to keep the tab open.
 
@@ -23,21 +23,20 @@ Duffel enforces a fixed-window request budget on this account (10 requests per w
 
 Atlantis's own API also rate-limits per client IP, independent of Duffel's: `/api/search` allows 10 requests per minute, `/api/subscribe` allows 20 per hour. Both return a 429 with a plain-English message when exceeded.
 
-## Known Limitations
-- **Subscriptions and email are best-effort.** If their env vars are omitted or misconfigured, flight search keeps working, subscribing just isn't available: without Supabase configured, `/api/subscribe` returns a clean "not configured" message, and without SMTP configured, emails are logged to the console instead of sent.
-- **Two `npm audit` advisories.** Both are in the Vite dev-server toolchain (build-time only, not shipped to production); fixing them needs a Vite major-version bump, tracked separately.
-
 ## Feature Backlog
 - Expand the hidden-city candidate cache beyond its current ~600 origin airports.
 - Multi-city and open-jaw itineraries, not just one-way/round-trip.
 - Per-user saved searches instead of one-off email subscriptions.
 - Historical price chart per route.
+- Sort/filter controls on results (duration, airline, layover length), not price-only ordering.
+- Cabin class selection (economy/business/first) at search time.
+- Shareable link for a specific itinerary, not just the booking redirect.
 
 ## Tech Stack
 - **Frontend**: React + Vite, styled with Tailwind CSS and [lucide-react](https://lucide.dev) icons
 - **Backend**: Node.js + Express (ESM, stateless JSON API)
 - **Flight data**: [Duffel](https://duffel.com) API
-- **Database**: Supabase (PostgreSQL, optional, subscriptions only, see [Known Limitations](#known-limitations))
+- **Database**: Supabase (PostgreSQL, optional — subscriptions are disabled until configured, flight search works regardless)
 - **Email**: SMTP via Nodemailer (optional)
 - **Scheduled jobs**: GitHub Actions, calling a secret-guarded API endpoint
 - **Deployment**: Render
@@ -99,6 +98,6 @@ Full defaults and comments are in [`.env.example`](.env.example).
 
 - `PORT`: backend port (Render sets this automatically).
 - `DUFFEL_API_KEY`: **required**. Flight search returns nothing without it. A `duffel_test_...` key works for local development against mock data; a `duffel_live_...` key returns real airline offers.
-- `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY`: Supabase **project** URL and server-only `service_role` key (Settings → API). Run `supabase/schema.sql` against your project first. Optional, see [Known Limitations](#known-limitations).
-- `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` / `SMTP_FROM`: SMTP credentials for subscription price-alert emails (a Gmail app password works). Optional, see [Known Limitations](#known-limitations).
+- `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY`: Supabase **project** URL and server-only `service_role` key (Settings → API). Run `supabase/schema.sql` against your project first. Optional — without both set, `/api/subscribe` returns a clean "not configured" message and flight search keeps working.
+- `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` / `SMTP_FROM`: SMTP credentials for subscription price-alert emails (a Gmail app password works). Optional — without all four set, emails are logged to the console instead of sent.
 - `JOB_SECRET`: shared secret required in the `x-job-secret` header to call `POST /api/jobs/check-subscriptions`. Only needed if you're using subscriptions.

@@ -18,3 +18,9 @@ alter table subscriptions enable row level security;
 -- No policies are defined: the server only ever talks to Supabase with the
 -- service_role key, which bypasses RLS. This table is intentionally
 -- unreachable from anon/authenticated clients.
+
+-- Keepalive: Supabase free tier pauses projects idle 7+ days. This job runs
+-- every 3 days directly inside Postgres so the project always shows activity,
+-- independent of whether the app server (Render) is awake.
+create extension if not exists pg_cron;
+select cron.schedule('keepalive', '0 0 */3 * *', $$ select 1 $$);

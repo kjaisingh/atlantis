@@ -2,6 +2,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import compression from 'compression';
 import express from 'express';
+import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import * as db from './db.js';
 import * as jobs from './jobs.js';
@@ -10,6 +11,12 @@ import { createRoutes } from './routes.js';
 import { searchOneWay } from './search.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const pageLimiter = rateLimit({
+  windowMs: 60_000,
+  limit: 300,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+});
 
 export function createApp({
   config = loadConfig(),
@@ -71,7 +78,7 @@ export function createApp({
       },
     }),
   );
-  app.use((request, response, next) => {
+  app.use(pageLimiter, (request, response, next) => {
     if (request.method !== 'GET' && request.method !== 'HEAD') {
       next();
       return;

@@ -1,5 +1,11 @@
 const DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+function isEmail(value) {
+  if (!value || value.length > 254 || /\s/u.test(value)) return false;
+  const at = value.indexOf('@');
+  if (at <= 0 || at !== value.lastIndexOf('@')) return false;
+  const dot = value.indexOf('.', at + 2);
+  return dot > at + 1 && dot < value.length - 1;
+}
 
 function calendarDate(value) {
   const match = DATE_PATTERN.exec(value ?? '');
@@ -61,7 +67,7 @@ export function validateSubscriber(body) {
   const priceThreshold = Number(body.priceThreshold);
   const currency = typeof body.currency === 'string' ? body.currency.trim().toUpperCase() : '';
 
-  if (!name || name.length > 120 || !EMAIL_PATTERN.test(email) || email.length > 254) {
+  if (!name || name.length > 120 || !isEmail(email)) {
     return { error: 'A valid name and email are required.' };
   }
   if (!Number.isFinite(priceThreshold) || priceThreshold <= 0 || priceThreshold > 1_000_000) {

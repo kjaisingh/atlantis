@@ -71,7 +71,11 @@ export function createApp({
       },
     }),
   );
-  app.get('/{*splat}', (_request, response) => {
+  app.use((request, response, next) => {
+    if (request.method !== 'GET' && request.method !== 'HEAD') {
+      next();
+      return;
+    }
     response.set('Cache-Control', 'no-cache');
     response.sendFile(path.join(distDir, 'index.html'));
   });

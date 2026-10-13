@@ -3,161 +3,152 @@ import * as duffelClient from './duffel.js';
 
 const cacheTable = JSON.parse(readFileSync(new URL('./data/cache-table.json', import.meta.url)));
 const lookupMap = JSON.parse(readFileSync(new URL('./data/lookup-map.json', import.meta.url)));
+const cacheIndex = new Map(cacheTable.map((entry) => [`${entry.X}:${entry.Y}`, entry.Z]));
+export const MAX_FANOUT_REQUESTS = 4;
 
-// Cache-table rows have up to 9 hidden-city candidates; uncapped, one direction alone
-// could need 10 Duffel requests (this account's whole rate-limit window) before a round
-// trip's other direction fires a single request. Capping keeps a full round trip (both
-// directions) comfortably under the 10-request budget without a wait in the common case.
-const MAX_FANOUT_CANDIDATES = 4;
+export function planRequests(origin, destination, limit = MAX_FANOUT_REQUESTS) {
+  const origins = lookupMap[origin] ?? [origin];
+  const destinations = lookupMap[destination] ?? [destination];
+  const direct = [];
+  const hidden = [];
 
-/**
- * Returns one-way itineraries for origin -> dest, cheapest first.
- * origin/dest may be a metro code (lookup-map.json) covering several airports.
- * Fans out across concrete-airport pairs and their cached hidden-city
- * candidates (if any), then filters each search down to itineraries that
- * actually pass through dest (or one of its metro members) as a layover.
- */
-export async function findAllOneWayFlights(origin, dest, date, numAdults) {
-  const originAirports = lookupMap[origin] ?? [origin];
-  const destAirports = lookupMap[dest] ?? [dest];
-
-  // Pass 1: a direct request for every concrete origin/dest pair, so a metro
-  // search always covers every member airport at least once.
-  const requests = [];
-  for (const o of originAirports) {
-    for (const d of destAirports) {
-      requests.push({ origin: o, candidate: d });
-    }
-  }
-  // Pass 2: fill any remaining budget with each pair's cached hidden-city candidates.
-  for (const o of originAirports) {
-    for (const d of destAirports) {
-      const cacheRow = cacheTable.find((entry) => entry.X === o && entry.Y === d);
-      if (!cacheRow) continue;
-      const zCandidates = cacheRow.Z.filter((z) => z !== o && !destAirports.includes(z));
-      for (const z of zCandidates) {
-        requests.push({ origin: o, candidate: z });
+  for (const from of origins) {
+    for (const to of destinations) {
+      direct.push({ origin: from, candidate: to, kind: 'direct' });
+      for (const candidate of cacheIndex.get(`${from}:${to}`) ?? []) {
+        if (candidate !== from && !destinations.includes(candidate)) {
+          hidden.push({ origin: from, candidate, kind: 'hidden-city' });
+        }
       }
     }
   }
 
-  const resultsList = await fetchData(requests.slice(0, MAX_FANOUT_CANDIDATES), date, numAdults);
-
-  let offers = [];
-  for (const offerRequest of resultsList) {
-    offers = offers.concat(filterJSONResult(offerRequest.offers, dest));
+  const unique = [];
+  const seen = new Set();
+  for (const request of [...direct, ...hidden]) {
+    const key = `${request.origin}:${request.candidate}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      unique.push(request);
+    }
   }
 
-  let itineraries = offers.map((offer) => OneWayFilterItems(offer, 0));
-  itineraries.sort((a, b) => a.price - b.price);
-  itineraries = filterData(itineraries, numAdults, dest);
-  return itineraries;
+  return {
+    requests: unique.slice(0, limit),
+    totalCandidates: unique.length,
+    truncated: unique.length > limit,
+  };
 }
 
 export async function fetchData(requests, departureDate, numAdults) {
-  const results = await Promise.allSettled(
-    requests.map((r) => duffelClient.oneWayLookup(r.origin, r.candidate, departureDate, numAdults)),
+  const settled = await Promise.allSettled(
+    requests.map((request) =>
+      duffelClient.oneWayLookup(request.origin, request.candidate, departureDate, numAdults),
+    ),
   );
-  return results
-    .filter((result) => {
-      if (result.status === 'rejected') {
-        console.error('[search] fan-out request failed:', result.reason?.message ?? result.reason);
-      }
-      return result.status === 'fulfilled';
-    })
-    .map((result) => result.value);
+  const fulfilled = [];
+  const errors = [];
+  settled.forEach((result, index) => {
+    if (result.status === 'fulfilled') fulfilled.push(result.value);
+    else {
+      errors.push({ request: requests[index], message: result.reason?.message ?? 'Unknown error' });
+      console.error('[search] fan-out request failed:', result.reason?.message ?? result.reason);
+    }
+  });
+  if (requests.length > 0 && fulfilled.length === 0) {
+    throw new AggregateError(
+      settled.filter((result) => result.status === 'rejected').map((result) => result.reason),
+      'Every Duffel fan-out request failed.',
+    );
+  }
+  return { fulfilled, errors };
 }
 
-/**
- * Normalizes filtered offers into flat itinerary summaries: airline, human
- * path, price, booking link, and the local departure/arrival time at dest
- * (dest may be a mid-itinerary layover, not the final ticketed stop).
- */
-export function filterData(itineraries, numAdults, dest) {
+export async function searchOneWay(origin, destination, date, numAdults) {
+  const plan = planRequests(origin, destination);
+  const { fulfilled, errors } = await fetchData(plan.requests, date, numAdults);
+  const offers = fulfilled.flatMap((result) => filterJSONResult(result.offers, destination));
+  const normalized = offers.map((offer) => OneWayFilterItems(offer, 0));
+  normalized.sort((left, right) =>
+    left.currency === right.currency
+      ? Number(left.price) - Number(right.price)
+      : left.currency.localeCompare(right.currency),
+  );
+  return {
+    itineraries: filterData(normalized, numAdults, destination),
+    meta: {
+      requested: plan.requests.length,
+      succeeded: fulfilled.length,
+      failed: errors.length,
+      truncated: plan.truncated,
+      totalCandidates: plan.totalCandidates,
+      partial: errors.length > 0 || plan.truncated,
+    },
+  };
+}
+
+export async function findAllOneWayFlights(origin, destination, date, numAdults) {
+  return (await searchOneWay(origin, destination, date, numAdults)).itineraries;
+}
+
+export function filterData(itineraries, numAdults, destination) {
   const results = [];
   const seenFlights = new Set();
-  let directPutOnTop = false;
-  const cities = lookupMap[dest] ?? [dest];
+  const destinationCodes = lookupMap[destination] ?? [destination];
 
   for (const itinerary of itineraries) {
-    const segments = itinerary.segments;
-
-    // Same physical flight(s) often reappear as several fare brands (basic/main/refundable) at
-    // different prices. Itineraries arrive price-sorted, so the first occurrence is the cheapest.
-    // Two nonstops at the same price but different departure times are distinct flights with
-    // distinct flight numbers, so they get distinct keys here and both survive — intentional,
-    // not a dedup gap.
-    const flightKey = segments.map((s) => `${s.carrierCode}${s.flightNumber}`).join('-');
-    if (seenFlights.has(flightKey)) {
-      continue;
-    }
+    if (!Array.isArray(itinerary.segments) || itinerary.segments.length === 0) continue;
+    const flightKey = itinerary.segments
+      .map(
+        (segment) =>
+          `${segment.origin}-${segment.destination}:${segment.carrierCode}${segment.flightNumber}:${segment.departureTime}`,
+      )
+      .join('|');
+    if (seenFlights.has(flightKey)) continue;
     seenFlights.add(flightKey);
 
-    const path = [segments[0].origin];
+    const path = [itinerary.segments[0].origin];
     const layovers = [];
-    let destIndex = -1;
+    let destinationIndex = -1;
+    itinerary.segments.forEach((segment, index) => {
+      if (index < itinerary.segments.length - 1) layovers.push(segment.destination);
+      if (destinationCodes.includes(segment.destination)) destinationIndex = index;
+      path.push(segment.destination);
+    });
+    if (destinationIndex === -1) continue;
 
-    for (let i = 0; i < segments.length; i += 1) {
-      if (i < segments.length - 1) {
-        layovers.push(segments[i].destination);
-      }
-      if (cities.includes(segments[i].destination)) {
-        destIndex = i;
-      }
-      path.push(segments[i].destination);
-    }
-
-    if (destIndex === -1) {
-      continue;
-    }
-
-    const dateFormat = {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: 'numeric',
-      hour12: true,
-    };
-
-    const isHiddenCity = !cities.includes(segments[segments.length - 1].destination);
-
-    const entry = {
-      airline: segments[0].carrierName,
+    const finalDestination = itinerary.segments.at(-1).destination;
+    const isHiddenCity = !destinationCodes.includes(finalDestination);
+    results.push({
+      airline: itinerary.segments[0].carrierName,
       path: path.join(' → '),
       price: itinerary.price,
+      currency: itinerary.currency,
+      duration: itinerary.totalDuration,
       isHiddenCity,
-      layoverCity: isHiddenCity ? dest : null,
-      nonstop: segments.length === 1,
+      layoverCity: isHiddenCity ? destination : null,
+      nonstop: itinerary.segments.length === 1,
       bookingLink: getBookingLink(
-        segments[0].origin,
-        segments[segments.length - 1].destination,
-        segments[0].departureTime.substring(0, 10),
-        segments[0].carrierCode,
+        itinerary.segments[0].origin,
+        finalDestination,
+        itinerary.segments[0].departureTime.substring(0, 10),
+        itinerary.segments[0].carrierCode,
         layovers,
         numAdults,
       ),
-      departureTime: new Date(segments[0].departureTime).toLocaleString('en-US', dateFormat),
-      arrivalTime: new Date(segments[destIndex].arrivalTime).toLocaleString('en-US', dateFormat),
-    };
-
-    if (!directPutOnTop && cities.includes(segments[segments.length - 1].destination)) {
-      results.unshift(entry);
-      directPutOnTop = true;
-    } else {
-      results.push(entry);
-    }
+      departureTime: itinerary.segments[0].departureTime,
+      arrivalTime: itinerary.segments[destinationIndex].arrivalTime,
+    });
   }
-
   return results;
 }
 
-export function getBookingLink(source, dest, date, airline, layovers, numAdults) {
-  const layoverString = layovers.join(',');
-  return `https://www.kayak.com/flights/${source}-${dest}/${date}/${numAdults}adults?sort=price_a&fs=airlines=~${airline};stops=~${layovers.length};layoverair=${layoverString}`;
+export function getBookingLink(source, destination, date, airline, layovers, numAdults) {
+  const route = `${encodeURIComponent(source)}-${encodeURIComponent(destination)}/${encodeURIComponent(date)}/${encodeURIComponent(`${numAdults}adults`)}`;
+  const filters = `airlines=~${airline};stops=~${layovers.length};layoverair=${layovers.join(',')}`;
+  return `https://www.kayak.com/flights/${route}?sort=price_a&fs=${encodeURIComponent(filters)}`;
 }
 
-/** Flattens one slice of a Duffel offer into the fields the app cares about. */
 export function OneWayFilterItems(offer, sliceIndex) {
   const slice = offer.slices[sliceIndex];
   return {
@@ -178,10 +169,11 @@ export function OneWayFilterItems(offer, sliceIndex) {
   };
 }
 
-/** Keeps only offers whose first slice actually routes through dest (or one of its metro members). */
-export function filterJSONResult(offers, dest) {
-  const cities = lookupMap[dest] ?? [dest];
+export function filterJSONResult(offers, destination) {
+  const destinationCodes = lookupMap[destination] ?? [destination];
   return offers.filter((offer) =>
-    offer.slices[0].segments.some((segment) => cities.includes(segment.destination.iata_code)),
+    offer.slices[0].segments.some((segment) =>
+      destinationCodes.includes(segment.destination.iata_code),
+    ),
   );
 }

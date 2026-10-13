@@ -1,103 +1,127 @@
 # Atlantis
-[![CI](https://github.com/kjaisingh/atlantis/actions/workflows/build.yml/badge.svg)](https://github.com/kjaisingh/atlantis/actions/workflows/build.yml)
 
-Atlantis is a hidden-city flight search tool: it finds itineraries where the airport you actually want to fly to is just a layover on a *cheaper* ticket to somewhere further away.
+[![Build](https://github.com/kjaisingh/atlantis/actions/workflows/build.yml/badge.svg)](https://github.com/kjaisingh/atlantis/actions/workflows/build.yml)
+[![CodeQL](https://github.com/kjaisingh/atlantis/actions/workflows/codeql.yml/badge.svg)](https://github.com/kjaisingh/atlantis/actions/workflows/codeql.yml)
 
-Here's the trick it's built around. Airlines usually price a one-stop itinerary lower than the nonstop leg buried inside it: a ticket from JFK to ORD with a layover in DTW can cost less than a ticket straight from JFK to DTW. If DTW was your real destination all along, you book the JFK→ORD fare, get off at the layover, and walk away without ever boarding the second flight. Atlantis searches for exactly these opportunities: give it a real origin and destination, and it checks the direct fare against fares to every other airport in its cache that happens to route through your destination first.
+Atlantis compares ordinary nonstop fares with hidden-city itineraries: tickets whose connection is the traveler’s intended destination. It searches and links to matching Kayak results; it never books travel or handles payment.
 
-## Overview
-- **Search**: enter an origin, destination, date(s), and traveler count. Atlantis checks the direct fare to your real destination, then cross-references its cache of routes to find every other airport that's reachable through your destination as a layover, and prices out a ticket to each one.
-- **Compare**: results come back sorted cheapest-first. When a nonstop to your real destination exists, it's pinned at the top as a price anchor and badged "Direct," so you can see at a glance how much a hidden-city option would save, or whether it's not worth the risk this time. A savings banner at the top of the list does that math for you ("Save $X vs the $Y direct fare") whenever a cheaper hidden-city option beats the nonstop baseline.
-- **Book**: each result links out to a matching Kayak search pre-filled with the right route and dates. Atlantis is a search tool, not a travel agent: it never touches payment or booking.
-- **Subscribe**: found a route you're watching but the price isn't there yet? Leave your email, a route, and a price threshold, and a scheduled job re-checks it periodically. The moment a matching fare under your threshold appears, you get an email, no need to keep the tab open.
+## What it does
 
-## How It Works
-Duffel's flight search API only answers "what does this exact origin→destination itinerary cost." It has no concept of hidden-city fares on its own. Atlantis builds that on top:
+- Searches one-way and round-trip routes through Duffel.
+- Compares prices only within the same ISO currency.
+- Shows nonstop and hidden-city options with price, route, and departure filters.
+- Reports partial results when an upstream request fails or the request budget truncates coverage.
+- Optionally stores price alerts in Supabase and sends them through SMTP.
 
-1. A precomputed cache (`server/data/cache-table.json` + `lookup-map.json`) maps each origin airport to a shortlist of destinations that are known to have flights routing through it as a layover, roughly 600 origin airports and ~6,000 candidate routes in total.
-2. A search looks up the requested origin in that cache, then fires off up to 4 Duffel `offer_request`s per direction: one for the direct route to your destination, plus up to 3 of the cache's candidate hidden-city destinations for that origin. That cap keeps a full round trip (both directions) comfortably under Duffel's rate-limit window without a wait in the common case.
-3. Each result is normalized to a common shape (segments, layovers, price, cabin), the metro-area aliases in the destination are resolved so, say, all of London's airports count as the same city, and everything is sorted by price, with the nonstop fare (when one exists) pinned at the top as a price anchor.
-4. Round trips run this whole process twice, once per direction, and pair up outbound/inbound results independently rather than cross-producing every combination.
+## Important travel risks
 
-Duffel enforces a fixed-window request budget on this account (10 requests per window), reported via its `ratelimit-*` response headers rather than a hard concurrency cap. Atlantis tracks that budget live off those headers: requests run up to 3 at a time rather than one-by-one, but pause automatically whenever the tracked budget hits zero until the window resets. A 429 response is still a safety net: it triggers a jittered retry (up to 3 attempts) keyed off Duffel's `ratelimit-reset` header rather than a blind fixed delay.
+Hidden-city travel is not appropriate for every trip. Use carry-on baggage only: checked bags normally continue to the ticketed destination. Skipping a segment cancels every later segment on that ticket, so return travel must be booked separately. Airlines may reroute a connection, restrict loyalty-account benefits, or treat repeated use as a fare-rule violation. Travelers remain responsible for visa, entry, and transit requirements at every airport.
 
-Atlantis's own API also rate-limits per client IP, independent of Duffel's: `/api/search` allows 10 requests per minute, `/api/subscribe` allows 20 per hour. Both return a 429 with a plain-English message when exceeded.
+## How search works
 
-## Feature Backlog
-- Expand the hidden-city candidate cache beyond its current ~600 origin airports.
-- Multi-city and open-jaw itineraries, not just one-way/round-trip.
-- Per-user saved searches instead of one-off email subscriptions.
-- Historical price chart per route.
-- Sort/filter controls on results (duration, airline, layover length), not price-only ordering.
-- Cabin class selection (economy/business/first) at search time.
-- Shareable link for a specific itinerary, not just the booking redirect.
+Duffel prices a requested origin and ticketed destination. Atlantis plans up to four requests per direction:
 
-## Tech Stack
-- **Frontend**: React + Vite, styled with Tailwind CSS and [lucide-react](https://lucide.dev) icons
-- **Backend**: Node.js + Express (ESM, stateless JSON API)
-- **Flight data**: [Duffel](https://duffel.com) API
-- **Database**: Supabase (PostgreSQL, optional — subscriptions are disabled until configured, flight search works regardless)
-- **Email**: SMTP via Nodemailer (optional)
-- **Scheduled jobs**: GitHub Actions, calling a secret-guarded API endpoint
-- **Deployment**: Render
+1. Concrete origin/destination pairs are planned first, including metro aliases from `lookup-map.json`.
+2. Remaining budget is filled with hidden-city candidates from `cache-table.json`.
+3. Offers that actually pass through the requested destination are normalized and deduplicated by route, flight number, and departure time.
+4. Results are grouped by currency and sorted by numeric price within each currency.
 
-## Local Development
-1. Install dependencies.
-   ```bash
-   npm install
-   ```
-2. Create a local env file.
-   ```bash
-   cp .env.example .env
-   ```
-3. Sign up for a free account at [duffel.com](https://duffel.com) and grab an API token from your workspace's developer settings. Duffel issues both a `duffel_test_...` sandbox token (mock offers, no cost, good for kicking the tires) and a `duffel_live_...` token (real airline offers, requires account verification). Either works: paste it into `.env` as `DUFFEL_API_KEY`. Everything else is optional, see [Environment Variables](#environment-variables) for what each one unlocks.
-4. Start backend + frontend.
-   ```bash
-   npm run dev
-   ```
-5. Open the app.
-   ```
-   http://localhost:5173
-   ```
+Four requests are a budget, not a completeness guarantee. Large metro combinations and routes with many cached candidates can be truncated. The API exposes `meta.outbound` and `meta.inbound` with `requested`, `succeeded`, `failed`, `totalCandidates`, `truncated`, and `partial`; the UI shows this state.
 
-## Scripts
-- `npm run dev`: run the Express API and the Vite dev server together, with the frontend proxying `/api` requests to the backend.
-- `npm run dev:server`: just the backend, auto-restarting on change via nodemon.
-- `npm run dev:client`: just the Vite dev server.
-- `npm run build`: production frontend build, output to `dist/`.
-- `npm start`: run the production server, which serves `dist/` and the JSON API from one process.
-- `npm run preview`: serve the built frontend locally without the backend, for a quick static check.
-- `npm test`: backend unit tests via Node's built-in test runner.
-- `node scripts/smoke-test.mjs`: Playwright script that drives a real search end-to-end (desktop + mobile) against a running instance and screenshots each step. Point it elsewhere with `SMOKE_URL`.
+## Architecture
 
-## Testing & CI
-`npm test` covers dedup, hidden-city classification, nonstop pinning, and booking-link shape with synthetic data (no live Duffel calls). `node scripts/smoke-test.mjs` drives a real search end-to-end against a running instance. [`.github/workflows/build.yml`](.github/workflows/build.yml) runs `npm ci`, `npm run build`, and `npm test` on every push and pull request to `main`, so a build- or logic-breaking change gets flagged in CI before it reaches Render.
+```text
+React + Vite UI
+       │ /api
+Express app factory ── validated routes ── search planner ── Duffel API
+       │
+       ├── Supabase subscriptions (optional)
+       └── SMTP delivery (optional)
+```
 
-## Deployment
+- `src/`: React UI and API client.
+- `server/app.js`: testable Express application factory.
+- `server/index.js`: process startup and graceful shutdown only.
+- `server/routes.js`: HTTP contracts, rate limits, and capability gates.
+- `server/search.js`: request planning, normalization, and deduplication.
+- `server/duffel.js`: bounded fetch client, concurrency, timeout, and retry logic.
+- `server/data/`: precomputed airport and hidden-city candidate data.
+- `supabase/`: repeatable baseline schema and additive migrations.
 
-### Blueprint
-1. Push this repo to GitHub.
-2. In Render, choose **New +** → **Blueprint**.
-3. Select your GitHub repo.
-4. Render reads `render.yaml` and prompts for the secret env vars it declares.
+## Local development
 
-### Manual Web Service
-- Build Command: `npm ci && npm run build`
-- Start Command: `npm start`
-- Runtime: Node 18+
-- Set env vars per [Environment Variables](#environment-variables).
+Requirements: Node.js 22+ and a Duffel test or live token.
 
-### Scheduled subscription checks
-[`.github/workflows/check-subscriptions.yml`](.github/workflows/check-subscriptions.yml) calls `POST /api/jobs/check-subscriptions` on a daily schedule. Set `JOB_SECRET` identically as a GitHub Actions repository secret and as a Render env var, and set the workflow's target URL to your deployed app. This also has the side effect of waking a free Render instance from its idle spin-down, since Render's free tier sleeps a service after 15 minutes without traffic.
+```bash
+npm ci
+cp .env.example .env
+npm run dev
+```
 
-### Health check
-`GET /api/health` returns `{status: "ok", persistenceEnabled}` and requires no auth. `render.yaml` points Render's own health check at this path so a broken deploy gets flagged instead of promoted; it also works for any external uptime monitor you want to point at the app.
+Open <http://localhost:5173>. Keep live API tokens in `.env`; never commit them. If a token is exposed, revoke it before removing it from history.
 
-## Environment Variables
-Full defaults and comments are in [`.env.example`](.env.example).
+### Environment variables
 
-- `PORT`: backend port (Render sets this automatically).
-- `DUFFEL_API_KEY`: **required**. Flight search returns nothing without it. A `duffel_test_...` key works for local development against mock data; a `duffel_live_...` key returns real airline offers.
-- `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY`: Supabase **project** URL and server-only `service_role` key (Settings → API). Run `supabase/schema.sql` against your project first. Optional — without both set, `/api/subscribe` returns a clean "not configured" message and flight search keeps working.
-- `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` / `SMTP_FROM`: SMTP credentials for subscription price-alert emails (a Gmail app password works). Optional — without all four set, emails are logged to the console instead of sent.
-- `JOB_SECRET`: shared secret required in the `x-job-secret` header to call `POST /api/jobs/check-subscriptions`. Only needed if you're using subscriptions.
+| Variable                                           | Required             | Purpose                                                  |
+| -------------------------------------------------- | -------------------- | -------------------------------------------------------- |
+| `PORT`                                             | No                   | Express port; defaults to `3000`.                        |
+| `DUFFEL_API_KEY`                                   | For search           | Duffel test or live token.                               |
+| `SUPABASE_URL`                                     | For alerts           | Supabase project URL.                                    |
+| `SUPABASE_SERVICE_ROLE_KEY`                        | For alerts           | Server-only service-role key.                            |
+| `SUBSCRIPTION_SCHEMA_VERSION`                      | For alerts           | Set to `20261013` after applying the currency migration. |
+| `SMTP_HOST`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` | For alerts           | SMTP delivery; all four are required.                    |
+| `SMTP_PORT`                                        | No                   | Defaults to `587`.                                       |
+| `JOB_SECRET`                                       | For scheduled alerts | Shared secret for the job endpoint.                      |
+
+Alerts require both Supabase values, all SMTP values, and the current schema version. Missing SMTP never falls back to logging recipient data or marking an alert sent.
+
+## Database setup and migration
+
+For a new project, run `supabase/schema.sql` in Supabase SQL Editor. Existing deployments created before currency-aware alerts must first run:
+
+```text
+supabase/migrations/20261013_add_subscription_currency.sql
+```
+
+The migration assigns `USD` to existing rows. Review or pause old alerts if their original currency is unknown. Then set `SUBSCRIPTION_SCHEMA_VERSION=20261013` in Render. Until then, search remains available and new alert creation stays safely disabled.
+
+## Commands
+
+| Command                 | Purpose                                                  |
+| ----------------------- | -------------------------------------------------------- |
+| `npm run dev`           | Run Vite and Express with API proxying.                  |
+| `npm test`              | Run server unit and integration tests.                   |
+| `npm run validate:data` | Validate airport, metro, and cache contracts.            |
+| `npm run lint`          | Run ESLint.                                              |
+| `npm run format:check`  | Verify Prettier formatting.                              |
+| `npm run build`         | Build production assets into `dist/`.                    |
+| `npm run test:e2e`      | Run deterministic desktop/mobile Playwright smoke tests. |
+| `npm run check`         | Run formatting, lint, data, tests, and build.            |
+
+`npm run test:e2e` starts a local production server and intercepts API calls with deterministic fixtures. Set `SMOKE_URL` to test an already-running deployment. Set `SMOKE_LIVE=1` only for an intentional live Duffel check.
+
+## Data maintenance
+
+`server/data/cache-table.json` is generated route-candidate data, not an authoritative schedule. Do not hand-edit it without a reproducible source. `npm run validate:data` checks JSON shape, code formats, duplicate airports, metro membership, cache-pair uniqueness, and duplicate candidates. Missing display metadata is reported as a warning because airport provenance is incomplete.
+
+## API
+
+- `GET /api/health`: status, deployed commit version, and enabled capabilities.
+- `GET /api/airports`: searchable airport and metro directory.
+- `POST /api/search`: validated flight search.
+- `POST /api/subscribe`: price-alert creation; disabled unless database, SMTP, and schema are ready.
+- `POST /api/jobs/check-subscriptions`: secret-guarded scheduled delivery.
+
+Search accepts `{origin, destination, departureDate, returnDate?, travelers}`. Alert creation adds `{name, email, priceThreshold, currency}` and returns only an ID, timestamp, and status message—not stored PII.
+
+## Deployment and CI
+
+`render.yaml` defines the Render service on Node 22. Configure all secrets in Render, and set GitHub Actions secrets `ATLANTIS_URL` and `JOB_SECRET`.
+
+CI runs formatting, lint, data validation, unit/integration tests, production build, high-severity production dependency audit, and deterministic browser tests. CodeQL runs on pushes, pull requests, and weekly; Dependabot covers npm and GitHub Actions; pull requests receive dependency review. After a successful `main` build, deployment verification waits until `/api/health` reports the exact pushed commit SHA, then checks the home page and airport API.
+
+The daily subscription workflow intentionally has no manual-dispatch button because running it can send real email.
+
+## License
+
+[MIT](LICENSE)

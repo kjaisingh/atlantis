@@ -1,14 +1,20 @@
 import * as db from './db.js';
-import { findAllOneWayFlights } from './search.js';
+import { searchOneWay } from './search.js';
 import { sendPriceAlertEmail, sendExpiredEmail } from './email.js';
 
-function isExpired(subscription) {
-  return new Date(subscription.departure_date) < new Date();
+let running = false;
+
+export function isExpired(subscription, today = new Date().toISOString().slice(0, 10)) {
+  return subscription.departure_date < today;
 }
 
-async function cheapestItinerary(origin, destination, date, travelers) {
-  const results = await findAllOneWayFlights(origin, destination, date, travelers);
-  return results[0] ?? null;
+async function cheapestItinerary(origin, destination, date, travelers, currency) {
+  const { itineraries } = await searchOneWay(origin, destination, date, travelers);
+  return (
+    itineraries
+      .filter((itinerary) => itinerary.currency === currency)
+      .sort((left, right) => Number(left.price) - Number(right.price))[0] ?? null
+  );
 }
 
 /**
@@ -17,17 +23,19 @@ async function cheapestItinerary(origin, destination, date, travelers) {
  * Called from POST /api/jobs/check-subscriptions, driven by a scheduled
  * GitHub Actions workflow rather than an in-process timer.
  */
-export async function checkSubscriptions() {
+async function processSubscriptions() {
   const subscriptions = await db.getPendingSubscriptions();
   let checked = 0;
   let matched = 0;
+  const failures = [];
 
   for (const subscription of subscriptions) {
     checked += 1;
 
     try {
+      const currency = subscription.currency || 'USD';
       if (isExpired(subscription)) {
-        await sendExpiredEmail(subscription);
+        await sendExpiredEmail({ ...subscription, currency });
         await db.deleteSubscription(subscription.id);
         continue;
       }
@@ -37,6 +45,7 @@ export async function checkSubscriptions() {
         subscription.destination,
         subscription.departure_date,
         subscription.num_travelers,
+        currency,
       );
 
       if (!outbound) {
@@ -52,6 +61,7 @@ export async function checkSubscriptions() {
           subscription.origin,
           subscription.return_date,
           subscription.num_travelers,
+          currency,
         );
         if (!inbound) {
           continue;
@@ -61,13 +71,27 @@ export async function checkSubscriptions() {
 
       if (totalPrice <= subscription.price_threshold) {
         matched += 1;
-        await sendPriceAlertEmail(subscription, outbound, inbound, totalPrice);
+        await sendPriceAlertEmail({ ...subscription, currency }, outbound, inbound, totalPrice);
         await db.markNotified(subscription.id);
       }
     } catch (err) {
       console.error(`[jobs] failed processing subscription ${subscription.id}:`, err.message);
+      failures.push(err);
     }
   }
 
+  if (failures.length > 0) {
+    throw new AggregateError(failures, `${failures.length} subscription checks failed.`);
+  }
   return { checked, matched };
+}
+
+export async function checkSubscriptions() {
+  if (running) throw new Error('A subscription check is already running.');
+  running = true;
+  try {
+    return await processSubscriptions();
+  } finally {
+    running = false;
+  }
 }

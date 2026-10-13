@@ -3,13 +3,30 @@ name: Check subscriptions
 on:
   schedule:
     - cron: '0 13 * * *'
-  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: subscription-delivery
+  cancel-in-progress: false
 
 jobs:
   check:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - name: Trigger check on the deployed app
+      - name: Trigger subscription check
+        env:
+          ATLANTIS_URL: ${{ secrets.ATLANTIS_URL }}
+          JOB_SECRET: ${{ secrets.JOB_SECRET }}
         run: |
-          curl -fsS -X POST "${{ secrets.ATLANTIS_URL }}/api/jobs/check-subscriptions" \
-            -H "x-job-secret: ${{ secrets.JOB_SECRET }}"
+          response="$(curl --fail-with-body --silent --show-error \
+            --retry 2 --retry-all-errors --max-time 300 \
+            -X POST "${ATLANTIS_URL}/api/jobs/check-subscriptions" \
+            -H "x-job-secret: ${JOB_SECRET}")"
+          node -e '
+            const result = JSON.parse(process.argv[1]);
+            if (!Number.isInteger(result.checked) || !Number.isInteger(result.matched)) process.exit(1);
+            console.log(`Checked ${result.checked}; matched ${result.matched}.`);
+          ' "$response"

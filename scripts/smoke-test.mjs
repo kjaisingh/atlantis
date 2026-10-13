@@ -1,81 +1,152 @@
+import { spawn } from 'node:child_process';
+import { mkdir } from 'node:fs/promises';
 import { chromium } from 'playwright';
-import { mkdirSync } from 'fs';
 
-const baseUrl = process.env.SMOKE_URL || 'http://localhost:5173';
+const port = 4173;
+const baseUrl = process.env.SMOKE_URL || `http://127.0.0.1:${port}`;
 const outDir = process.env.SMOKE_OUT || '/tmp/atlantis-smoke';
-mkdirSync(outDir, { recursive: true });
+const live = process.env.SMOKE_LIVE === '1';
+await mkdir(outDir, { recursive: true });
 
-const consoleErrors = [];
-const pageErrors = [];
+let server;
+if (!process.env.SMOKE_URL) {
+  server = spawn(process.execPath, ['server/index.js'], {
+    env: {
+      ...process.env,
+      PORT: String(port),
+      DUFFEL_API_KEY: 'smoke-test-only',
+      NODE_ENV: 'test',
+    },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    try {
+      if ((await fetch(`${baseUrl}/api/health`)).ok) break;
+    } catch {
+      // Server may still be starting.
+    }
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    if (attempt === 39) throw new Error('Smoke-test server did not start.');
+  }
+}
 
 const browser = await chromium.launch();
+const failures = [];
 
-async function shot(page, name) {
-  await page.screenshot({ path: `${outDir}/${name}.png`, fullPage: true });
-  console.log(`[shot] ${name}`);
+function monitor(page, label) {
+  page.on('console', (message) => {
+    if (message.type() === 'error') failures.push(`${label} console: ${message.text()}`);
+  });
+  page.on('pageerror', (error) => failures.push(`${label} page: ${error.message}`));
+  page.on('requestfailed', (request) =>
+    failures.push(`${label} request: ${request.url()} ${request.failure()?.errorText}`),
+  );
 }
 
-// --- Desktop pass ---
-const desktop = await browser.newContext({ viewport: { width: 1440, height: 900 } });
-const page = await desktop.newPage();
-page.on('console', (msg) => {
-  if (msg.type() === 'error') consoleErrors.push(msg.text());
-});
-page.on('pageerror', (err) => pageErrors.push(String(err)));
+async function mockApi(page) {
+  if (live) return;
+  await page.route('**/api/health', (route) =>
+    route.fulfill({
+      json: {
+        status: 'ok',
+        version: 'smoke',
+        capabilities: { search: true, subscriptions: true },
+      },
+    }),
+  );
+  await page.route('**/api/airports', (route) =>
+    route.fulfill({
+      json: [
+        { code: 'JFK', city: 'New York', name: 'John F. Kennedy International Airport' },
+        { code: 'DTW', city: 'Detroit', name: 'Detroit Metropolitan Airport' },
+      ],
+    }),
+  );
+  await page.route('**/api/search', (route) =>
+    route.fulfill({
+      json: {
+        outbound: [
+          {
+            airline: 'Example Air',
+            path: 'JFK → DTW',
+            price: '314.00',
+            currency: 'USD',
+            nonstop: true,
+            isHiddenCity: false,
+            departureTime: '2099-02-28T08:00:00Z',
+            arrivalTime: '2099-02-28T10:00:00Z',
+            bookingLink: 'https://example.com/direct',
+          },
+          {
+            airline: 'Example Air',
+            path: 'JFK → DTW → ORD',
+            price: '188.00',
+            currency: 'USD',
+            nonstop: false,
+            isHiddenCity: true,
+            layoverCity: 'DTW',
+            departureTime: '2099-02-28T08:00:00Z',
+            arrivalTime: '2099-02-28T10:00:00Z',
+            bookingLink: 'https://example.com/hidden',
+          },
+        ],
+        meta: {
+          outbound: {
+            requested: 4,
+            succeeded: 4,
+            failed: 0,
+            truncated: false,
+            totalCandidates: 4,
+            partial: false,
+          },
+        },
+      },
+    }),
+  );
+  await page.route('**/api/subscribe', (route) =>
+    route.fulfill({ status: 201, json: { id: 'test', message: 'Price alert created.' } }),
+  );
+}
 
-await page.goto(baseUrl, { waitUntil: 'networkidle' });
-await shot(page, '01-landing-desktop');
+async function runDesktop() {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const page = await context.newPage();
+  monitor(page, 'desktop');
+  await mockApi(page);
+  await page.goto(baseUrl, { waitUntil: 'networkidle' });
+  await page.screenshot({ path: `${outDir}/landing-desktop.png`, fullPage: true });
 
-await page.evaluate(() => document.querySelector('#how-it-works')?.scrollIntoView());
-await shot(page, '02-how-it-works-desktop');
+  await page.getByRole('combobox', { name: 'Origin' }).fill('JFK');
+  await page.getByRole('option', { name: /JFK/ }).click();
+  await page.getByRole('combobox', { name: 'Destination' }).fill('DTW');
+  await page.getByRole('option', { name: /DTW/ }).click();
+  await page.locator('#departureDate').fill('2099-02-28');
+  await page.getByRole('button', { name: 'Search flights' }).click();
+  await page.getByText('$188.00').waitFor();
+  await page.locator('a').filter({ hasText: 'Hidden-city' }).waitFor();
+  await page.getByRole('heading', { name: 'Watch this route' }).waitFor();
+  await page.screenshot({ path: `${outDir}/results-desktop.png`, fullPage: true });
+  await context.close();
+}
 
-await page.evaluate(() => document.querySelector('#search')?.scrollIntoView());
-await shot(page, '03-search-form-desktop');
-
-// Fill the search form and run a real search
-await page.getByRole('combobox', { name: 'Origin', exact: true }).fill('JFK');
-await page.getByRole('option', { name: /JFK/ }).first().click().catch(() => {});
-await page.getByRole('combobox', { name: 'Destination', exact: true }).fill('DTW');
-await page.getByRole('option', { name: /DTW/ }).first().click().catch(() => {});
-
-const departure = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-await page.locator('input[type="date"]').first().fill(departure);
-
-await shot(page, '04-search-form-filled');
-
-console.log('[search] submitting, this can take up to a minute against the live Duffel API...');
-await page.getByRole('button', { name: /search flights/i }).click();
-
-await shot(page, '05-search-loading');
+async function runMobile() {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const page = await context.newPage();
+  monitor(page, 'mobile');
+  await mockApi(page);
+  await page.goto(baseUrl, { waitUntil: 'networkidle' });
+  await page.getByRole('button', { name: 'Open menu' }).click();
+  await page.getByRole('link', { name: 'How it works' }).waitFor();
+  await page.screenshot({ path: `${outDir}/menu-mobile.png`, fullPage: true });
+  await context.close();
+}
 
 try {
-  await page.waitForSelector('text=/Outbound|No itineraries found/i', { timeout: 90000 });
-  await shot(page, '06-search-results');
-  const bodyText = await page.textContent('body');
-  console.log('[search] results rendered:', /No itineraries found/i.test(bodyText) ? 'empty' : 'itineraries present');
-} catch (err) {
-  await shot(page, '06-search-timeout');
-  console.error('[search] timed out waiting for results:', err.message);
+  await runDesktop();
+  await runMobile();
+  if (failures.length) throw new Error(failures.join('\n'));
+  console.log(`Smoke test passed. Screenshots: ${outDir}`);
+} finally {
+  await browser.close();
+  server?.kill('SIGTERM');
 }
-
-// --- Mobile pass ---
-const mobile = await browser.newContext({ viewport: { width: 390, height: 844 } });
-const mpage = await mobile.newPage();
-mpage.on('console', (msg) => {
-  if (msg.type() === 'error') consoleErrors.push(`[mobile] ${msg.text()}`);
-});
-await mpage.goto(baseUrl, { waitUntil: 'networkidle' });
-await shot(mpage, '07-landing-mobile');
-
-await mpage.getByRole('button', { name: /open menu/i }).click();
-await shot(mpage, '08-mobile-menu-open');
-
-await browser.close();
-
-console.log('\n--- console errors ---');
-console.log(consoleErrors.length ? consoleErrors.join('\n') : '(none)');
-console.log('--- page errors ---');
-console.log(pageErrors.length ? pageErrors.join('\n') : '(none)');
-console.log(`\nScreenshots written to ${outDir}`);
-
-if (consoleErrors.length || pageErrors.length) process.exit(1);

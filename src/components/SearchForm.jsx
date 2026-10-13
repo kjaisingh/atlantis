@@ -1,27 +1,40 @@
-import { useState } from 'react';
-import { ArrowLeftRight, Calendar, Users } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { ArrowLeftRight, Calendar, Search, Users } from 'lucide-react';
 import AirportCombobox from './AirportCombobox.jsx';
 
-const today = new Date().toISOString().slice(0, 10);
+function localDate() {
+  const now = new Date();
+  return new Date(now.getTime() - now.getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
+}
 
-export default function SearchForm({ airports, onSearch, loading }) {
+export default function SearchForm({ airports, onSearch, loading, disabled }) {
   const [tripType, setTripType] = useState('oneway');
   const [origin, setOrigin] = useState('');
   const [destination, setDestination] = useState('');
   const [departureDate, setDepartureDate] = useState('');
   const [returnDate, setReturnDate] = useState('');
   const [travelers, setTravelers] = useState(1);
+  const airportCodes = useMemo(() => new Set(airports.map((airport) => airport.code)), [airports]);
+  const today = localDate();
+  const validRoute =
+    airportCodes.has(origin) && airportCodes.has(destination) && origin !== destination;
 
   function handleSwap() {
     setOrigin(destination);
     setDestination(origin);
   }
 
+  function handleDepartureChange(value) {
+    setDepartureDate(value);
+    if (returnDate && returnDate < value) setReturnDate('');
+  }
+
   function handleSubmit(event) {
     event.preventDefault();
+    if (!validRoute) return;
     onSearch({
-      origin: origin.trim().toUpperCase(),
-      destination: destination.trim().toUpperCase(),
+      origin,
+      destination,
       departureDate,
       returnDate: tripType === 'roundtrip' ? returnDate : '',
       travelers: Number(travelers),
@@ -32,96 +45,74 @@ export default function SearchForm({ airports, onSearch, loading }) {
     <div id="search" className="scroll-mt-24 px-4 sm:px-6">
       <form
         onSubmit={handleSubmit}
-        className="mx-auto -mt-12 max-w-3xl rounded-2xl bg-white p-6 shadow-xl shadow-slate-200/60 ring-1 ring-slate-100 sm:-mt-16 sm:p-8"
+        className="mx-auto -mt-12 max-w-4xl rounded-3xl bg-white p-5 shadow-2xl shadow-slate-300/40 ring-1 ring-slate-200/70 sm:-mt-16 sm:p-8"
       >
-        <div className="inline-flex rounded-full bg-slate-100 p-1 text-sm font-medium">
-          <button
-            type="button"
-            onClick={() => setTripType('oneway')}
-            className={`rounded-full px-4 py-1.5 transition ${
-              tripType === 'oneway' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'
-            }`}
-          >
-            One-way
-          </button>
-          <button
-            type="button"
-            onClick={() => setTripType('roundtrip')}
-            className={`rounded-full px-4 py-1.5 transition ${
-              tripType === 'roundtrip' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'
-            }`}
-          >
-            Round-trip
-          </button>
-        </div>
+        <fieldset>
+          <legend className="sr-only">Trip type</legend>
+          <div className="inline-flex rounded-full bg-slate-100 p-1 text-sm font-semibold">
+            {[
+              ['oneway', 'One-way'],
+              ['roundtrip', 'Round-trip'],
+            ].map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                aria-pressed={tripType === value}
+                onClick={() => setTripType(value)}
+                className={`rounded-full px-4 py-2 transition ${
+                  tripType === value ? 'bg-white text-slate-950 shadow-sm' : 'text-slate-500'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </fieldset>
 
-        <div className="mt-5 grid gap-4 sm:grid-cols-2">
+        <div className="mt-6 grid items-end gap-3 sm:grid-cols-[1fr_auto_1fr]">
           <AirportCombobox
             label="Origin"
-            placeholder="e.g. JFK"
+            placeholder="Airport or city"
             airports={airports}
             value={origin}
             onChange={setOrigin}
           />
-
-          <div className="relative">
-            <AirportCombobox
-              label="Destination"
-              placeholder="e.g. LHR"
-              airports={airports}
-              value={destination}
-              onChange={setDestination}
-            />
-            <button
-              type="button"
-              onClick={handleSwap}
-              aria-label="Swap origin and destination"
-              className="absolute -top-1 right-0 hidden -translate-y-full items-center justify-center rounded-full border border-slate-200 bg-white p-1.5 text-slate-500 shadow-sm hover:text-brand-600 sm:-left-8 sm:top-1/2 sm:right-auto sm:flex sm:-translate-y-1/2 sm:-translate-x-1/2"
-            >
-              <ArrowLeftRight className="h-3.5 w-3.5" />
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={handleSwap}
+            aria-label="Swap origin and destination"
+            className="mx-auto flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:border-brand-200 hover:text-brand-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+          >
+            <ArrowLeftRight className="h-4 w-4 sm:rotate-0 rotate-90" />
+          </button>
+          <AirportCombobox
+            label="Destination"
+            placeholder="Airport or city"
+            airports={airports}
+            value={destination}
+            onChange={setDestination}
+          />
         </div>
 
-        <div className={`mt-4 grid gap-4 ${tripType === 'roundtrip' ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
-          <div>
-            <label htmlFor="departureDate" className="mb-1.5 block text-sm font-medium text-slate-700">
-              Departure
-            </label>
-            <div className="relative">
-              <Calendar className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <input
-                id="departureDate"
-                type="date"
-                min={today}
-                required
-                value={departureDate}
-                onChange={(event) => setDepartureDate(event.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-9 pr-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
-              />
-            </div>
-          </div>
-
+        <div
+          className={`mt-4 grid gap-4 ${tripType === 'roundtrip' ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}
+        >
+          <DateField
+            label="Departure"
+            id="departureDate"
+            min={today}
+            value={departureDate}
+            onChange={handleDepartureChange}
+          />
           {tripType === 'roundtrip' && (
-            <div>
-              <label htmlFor="returnDate" className="mb-1.5 block text-sm font-medium text-slate-700">
-                Return
-              </label>
-              <div className="relative">
-                <Calendar className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                <input
-                  id="returnDate"
-                  type="date"
-                  min={departureDate || today}
-                  required
-                  value={returnDate}
-                  onChange={(event) => setReturnDate(event.target.value)}
-                  className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-9 pr-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
-                />
-              </div>
-            </div>
+            <DateField
+              label="Return"
+              id="returnDate"
+              min={departureDate || today}
+              value={returnDate}
+              onChange={setReturnDate}
+            />
           )}
-
           <div>
             <label htmlFor="travelers" className="mb-1.5 block text-sm font-medium text-slate-700">
               Travelers
@@ -136,20 +127,47 @@ export default function SearchForm({ airports, onSearch, loading }) {
                 required
                 value={travelers}
                 onChange={(event) => setTravelers(event.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-9 pr-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
+                className="field pl-9"
               />
             </div>
           </div>
         </div>
 
+        {!validRoute && origin && destination && (
+          <p className="mt-3 text-sm text-amber-700">
+            Choose two different airports from the suggestions.
+          </p>
+        )}
         <button
           type="submit"
-          disabled={loading || !origin || !destination}
-          className="mt-6 w-full rounded-xl bg-gradient-brand py-3 text-sm font-semibold text-white shadow-lg shadow-brand-200 transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+          disabled={disabled || loading || !validRoute}
+          className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-brand py-3.5 text-sm font-bold text-white shadow-lg shadow-brand-200 transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {loading ? 'Searching…' : 'Search flights'}
+          <Search className="h-4 w-4" /> {loading ? 'Searching…' : 'Search flights'}
         </button>
       </form>
+    </div>
+  );
+}
+
+function DateField({ label, id, min, value, onChange }) {
+  return (
+    <div>
+      <label htmlFor={id} className="mb-1.5 block text-sm font-medium text-slate-700">
+        {label}
+      </label>
+      <div className="relative">
+        <Calendar className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+        <input
+          id={id}
+          type="date"
+          min={min}
+          required
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          className="field pl-9"
+        />
+      </div>
     </div>
   );
 }

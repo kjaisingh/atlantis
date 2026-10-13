@@ -8,11 +8,13 @@
 # testing
 /coverage
 
-# production
+# production output
 /build
-
-# production
 /dist
+
+# browser tests
+/playwright-report
+/test-results
 
 # misc
 .DS_Store

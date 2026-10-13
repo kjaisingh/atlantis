@@ -1,33 +1,13 @@
+import { timingSafeEqual } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import express from 'express';
 import rateLimit from 'express-rate-limit';
-import * as db from './db.js';
-import * as jobs from './jobs.js';
-import { findAllOneWayFlights } from './search.js';
-
-const router = express.Router();
-
-const searchLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  limit: 10,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: 'Too many searches. Please wait a moment and try again.' },
-});
-
-const subscribeLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000,
-  limit: 20,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: 'Too many subscription attempts. Please try again later.' },
-});
+import { validateSubscriber, validateTrip } from './validation.js';
 
 const airports = readFileSync(new URL('./data/airports.txt', import.meta.url), 'utf-8')
   .split('\n')
   .map((line) => line.trim())
   .filter(Boolean);
-
 const airportNames = JSON.parse(
   readFileSync(new URL('./data/airport-names.json', import.meta.url), 'utf-8'),
 );
@@ -51,156 +31,121 @@ const metroDirectory = Object.entries(lookupMap).map(([code, members]) => ({
 const searchableAirports = [...airportDirectory, ...metroDirectory];
 const airportSet = new Set([...airports, ...Object.keys(lookupMap)]);
 
-function isValidDate(value) {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    return false;
-  }
-  const date = new Date(`${value}T00:00:00`);
-  if (Number.isNaN(date.getTime())) {
-    return false;
-  }
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  return date >= today;
-}
+const searchLimiter = rateLimit({
+  windowMs: 60_000,
+  limit: 10,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  message: { error: 'Too many searches. Please wait a moment and try again.' },
+});
+const subscribeLimiter = rateLimit({
+  windowMs: 3_600_000,
+  limit: 20,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  message: { error: 'Too many subscription attempts. Please try again later.' },
+});
 
-function isReturnDateValid(departureDate, returnDate) {
-  return new Date(`${returnDate}T00:00:00`) >= new Date(`${departureDate}T00:00:00`);
-}
-
-// Pins the first true nonstop as a price anchor at the top of the list, so a hidden-city
-// savings claim is always compared against a real nonstop when one exists.
 export function pinNonstopFirst(itineraries) {
   const index = itineraries.findIndex((itinerary) => itinerary.nonstop);
-  if (index <= 0) {
-    return itineraries;
-  }
-  const [nonstop] = itineraries.splice(index, 1);
-  itineraries.unshift(nonstop);
-  return itineraries;
+  if (index <= 0) return [...itineraries];
+  return [itineraries[index], ...itineraries.slice(0, index), ...itineraries.slice(index + 1)];
 }
 
-router.get('/airports', (_req, res) => {
-  res.json(searchableAirports);
-});
+function secretMatches(actual, expected) {
+  if (typeof actual !== 'string' || !expected) return false;
+  const actualBuffer = Buffer.from(actual);
+  const expectedBuffer = Buffer.from(expected);
+  return (
+    actualBuffer.length === expectedBuffer.length && timingSafeEqual(actualBuffer, expectedBuffer)
+  );
+}
 
-router.post('/search', searchLimiter, async (req, res) => {
-  const { origin, destination, departureDate, returnDate, travelers } = req.body;
-  const numTravelers = Number(travelers);
+export function createRoutes({ config, database, jobRunner, searchFlights }) {
+  const router = express.Router();
 
-  if (!airportSet.has(origin) || !airportSet.has(destination)) {
-    return res.status(400).json({ error: 'Unknown origin or destination airport code.' });
-  }
-  if (origin === destination) {
-    return res.status(400).json({ error: 'Origin and destination must differ.' });
-  }
-  if (!isValidDate(departureDate)) {
-    return res.status(400).json({ error: 'Departure date must be a valid, non-past date.' });
-  }
-  if (returnDate && !isValidDate(returnDate)) {
-    return res.status(400).json({ error: 'Return date must be a valid, non-past date.' });
-  }
-  if (returnDate && !isReturnDateValid(departureDate, returnDate)) {
-    return res.status(400).json({ error: 'Return date must be on or after the departure date.' });
-  }
-  if (!Number.isInteger(numTravelers) || numTravelers < 1 || numTravelers > 9) {
-    return res.status(400).json({ error: 'Travelers must be an integer between 1 and 9.' });
-  }
+  router.get('/airports', (_request, response) => response.json(searchableAirports));
 
-  try {
-    const [outbound, inbound] = await Promise.all([
-      findAllOneWayFlights(origin, destination, departureDate, numTravelers),
-      returnDate ? findAllOneWayFlights(destination, origin, returnDate, numTravelers) : null,
-    ]);
-
-    const response = { outbound: pinNonstopFirst(outbound.slice(0, 10)) };
-    if (inbound) {
-      response.inbound = pinNonstopFirst(inbound.slice(0, 10));
+  router.post('/search', searchLimiter, async (request, response) => {
+    if (!config.duffelConfigured) {
+      response.status(503).json({ error: 'Flight search is not configured.' });
+      return;
     }
 
-    res.json(response);
-  } catch (err) {
-    console.error('[routes] search failed:', err.message);
-    res.status(502).json({ error: 'Flight search failed. Please try again shortly.' });
-  }
-});
+    const trip = validateTrip(request.body ?? {}, airportSet);
+    if (trip.error) {
+      response.status(400).json({ error: trip.error });
+      return;
+    }
 
-router.post('/subscribe', subscribeLimiter, async (req, res) => {
-  const {
-    name,
-    email,
-    origin,
-    destination,
-    departureDate,
-    returnDate,
-    travelers,
-    priceThreshold,
-  } = req.body;
-  const numTravelers = Number(travelers);
-  const threshold = Number(priceThreshold);
-
-  if (typeof name !== 'string' || typeof email !== 'string' || !name || !email || !/^\S+@\S+\.\S+$/.test(email)) {
-    return res.status(400).json({ error: 'A valid name and email are required.' });
-  }
-  if (name.length > 120 || email.length > 254) {
-    return res.status(400).json({ error: 'Name or email is too long.' });
-  }
-  if (!airportSet.has(origin) || !airportSet.has(destination)) {
-    return res.status(400).json({ error: 'Unknown origin or destination airport code.' });
-  }
-  if (origin === destination) {
-    return res.status(400).json({ error: 'Origin and destination must differ.' });
-  }
-  if (!isValidDate(departureDate)) {
-    return res.status(400).json({ error: 'Departure date must be a valid, non-past date.' });
-  }
-  if (returnDate && !isValidDate(returnDate)) {
-    return res.status(400).json({ error: 'Return date must be a valid, non-past date.' });
-  }
-  if (returnDate && !isReturnDateValid(departureDate, returnDate)) {
-    return res.status(400).json({ error: 'Return date must be on or after the departure date.' });
-  }
-  if (!Number.isInteger(numTravelers) || numTravelers < 1 || numTravelers > 9) {
-    return res.status(400).json({ error: 'Travelers must be an integer between 1 and 9.' });
-  }
-  if (!Number.isFinite(threshold) || threshold <= 0) {
-    return res.status(400).json({ error: 'Price threshold must be a positive number.' });
-  }
-  if (!db.isEnabled()) {
-    return res.status(503).json({ error: db.getConfigError() });
-  }
-
-  const subscription = await db.addSubscription({
-    name,
-    email,
-    origin,
-    destination,
-    departure_date: departureDate,
-    return_date: returnDate || null,
-    num_travelers: numTravelers,
-    price_threshold: threshold,
+    const { origin, destination, departureDate, returnDate, travelers } = trip.value;
+    try {
+      const [outbound, inbound] = await Promise.all([
+        searchFlights(origin, destination, departureDate, travelers),
+        returnDate ? searchFlights(destination, origin, returnDate, travelers) : null,
+      ]);
+      const result = {
+        outbound: pinNonstopFirst(outbound.itineraries).slice(0, 10),
+        meta: { outbound: outbound.meta },
+      };
+      if (inbound) {
+        result.inbound = pinNonstopFirst(inbound.itineraries).slice(0, 10);
+        result.meta.inbound = inbound.meta;
+      }
+      response.json(result);
+    } catch (error) {
+      console.error('[routes] search failed:', error.message);
+      response.status(502).json({ error: 'Flight search failed. Please try again shortly.' });
+    }
   });
 
-  if (!subscription) {
-    return res.status(502).json({ error: 'Could not save subscription. Please try again shortly.' });
-  }
+  router.post('/subscribe', subscribeLimiter, async (request, response) => {
+    if (!config.subscriptionsEnabled || !database.isEnabled()) {
+      response.status(503).json({ error: 'Price alerts are not currently available.' });
+      return;
+    }
+    const trip = validateTrip(request.body ?? {}, airportSet);
+    if (trip.error) {
+      response.status(400).json({ error: trip.error });
+      return;
+    }
+    const subscriber = validateSubscriber(request.body ?? {});
+    if (subscriber.error) {
+      response.status(400).json({ error: subscriber.error });
+      return;
+    }
 
-  res.status(201).json(subscription);
-});
+    const subscription = await database.addSubscription({
+      name: subscriber.value.name,
+      email: subscriber.value.email,
+      origin: trip.value.origin,
+      destination: trip.value.destination,
+      departure_date: trip.value.departureDate,
+      return_date: trip.value.returnDate || null,
+      num_travelers: trip.value.travelers,
+      price_threshold: subscriber.value.priceThreshold,
+      currency: subscriber.value.currency,
+    });
 
-router.post('/jobs/check-subscriptions', async (req, res) => {
-  const secret = process.env.JOB_SECRET;
-  if (!secret || req.headers['x-job-secret'] !== secret) {
-    return res.status(401).json({ error: 'Unauthorized.' });
-  }
+    response.status(201).json({
+      id: subscription.id,
+      createdAt: subscription.created_at,
+      message: 'Price alert created.',
+    });
+  });
 
-  try {
-    const result = await jobs.checkSubscriptions();
-    res.json(result);
-  } catch (err) {
-    console.error('[routes] check-subscriptions failed:', err.message);
-    res.status(500).json({ error: 'Subscription check failed.' });
-  }
-});
+  router.post('/jobs/check-subscriptions', async (request, response) => {
+    if (!secretMatches(request.headers['x-job-secret'], process.env.JOB_SECRET)) {
+      response.status(401).json({ error: 'Unauthorized.' });
+      return;
+    }
+    try {
+      response.json(await jobRunner.checkSubscriptions());
+    } catch (error) {
+      console.error('[routes] check-subscriptions failed:', error.message);
+      response.status(500).json({ error: 'Subscription check failed.' });
+    }
+  });
 
-export default router;
+  return router;
+}

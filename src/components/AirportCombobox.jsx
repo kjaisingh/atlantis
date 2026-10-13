@@ -10,6 +10,8 @@ export default function AirportCombobox({ label, value, onChange, airports, plac
   const listboxId = useId();
 
   useEffect(() => {
+    // Parent-driven swaps must update the visible text as well as the selected code.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setQuery(value || '');
   }, [value]);
 
@@ -25,6 +27,7 @@ export default function AirportCombobox({ label, value, onChange, airports, plac
       )
       .slice(0, 8);
   }, [query, airports]);
+  const hasQuery = query.trim().length > 0;
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -51,6 +54,10 @@ export default function AirportCombobox({ label, value, onChange, airports, plac
   }
 
   function handleKeyDown(event) {
+    if (event.key === 'Tab') {
+      setOpen(false);
+      return;
+    }
     if (!open || matches.length === 0) return;
     if (event.key === 'ArrowDown') {
       event.preventDefault();
@@ -63,6 +70,12 @@ export default function AirportCombobox({ label, value, onChange, airports, plac
       if (matches[highlighted]) selectAirport(matches[highlighted]);
     } else if (event.key === 'Escape') {
       setOpen(false);
+    } else if (event.key === 'Home') {
+      event.preventDefault();
+      setHighlighted(0);
+    } else if (event.key === 'End') {
+      event.preventDefault();
+      setHighlighted(matches.length - 1);
     }
   }
 
@@ -80,7 +93,9 @@ export default function AirportCombobox({ label, value, onChange, airports, plac
           aria-autocomplete="list"
           aria-expanded={open && matches.length > 0}
           aria-controls={listboxId}
-          aria-activedescendant={open && matches.length > 0 ? `${listboxId}-opt-${highlighted}` : undefined}
+          aria-activedescendant={
+            open && matches.length > 0 ? `${listboxId}-opt-${highlighted}` : undefined
+          }
           autoComplete="off"
           value={query}
           onChange={handleInputChange}
@@ -97,24 +112,34 @@ export default function AirportCombobox({ label, value, onChange, airports, plac
           className="absolute z-20 mt-1.5 w-full max-h-64 overflow-auto rounded-xl border border-slate-200 bg-white py-1 shadow-lg"
         >
           {matches.map((airport, index) => (
-            <li key={airport.code} id={`${listboxId}-opt-${index}`} role="option" aria-selected={index === highlighted}>
-              <button
-                type="button"
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => selectAirport(airport)}
-                onMouseEnter={() => setHighlighted(index)}
-                className={`flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm ${
-                  index === highlighted ? 'bg-brand-50' : 'hover:bg-slate-50'
-                }`}
-              >
-                <span className="font-semibold text-slate-900">{airport.code}</span>
-                <span className="truncate text-slate-500">
-                  {airport.city ? `${airport.city}${airport.name ? ` · ${airport.name}` : ''}` : 'Airport'}
-                </span>
-              </button>
+            <li
+              key={airport.code}
+              id={`${listboxId}-opt-${index}`}
+              role="option"
+              aria-selected={index === highlighted}
+              onMouseDown={(event) => {
+                event.preventDefault();
+                selectAirport(airport);
+              }}
+              onMouseEnter={() => setHighlighted(index)}
+              className={`flex cursor-pointer items-center justify-between gap-3 px-3 py-2 text-left text-sm ${
+                index === highlighted ? 'bg-brand-50' : 'hover:bg-slate-50'
+              }`}
+            >
+              <span className="font-semibold text-slate-900">{airport.code}</span>
+              <span className="truncate text-slate-500">
+                {airport.city
+                  ? `${airport.city}${airport.name ? ` · ${airport.name}` : ''}`
+                  : 'Airport'}
+              </span>
             </li>
           ))}
         </ul>
+      )}
+      {open && hasQuery && matches.length === 0 && (
+        <p className="absolute z-20 mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-500 shadow-lg">
+          No matching airport found.
+        </p>
       )}
     </div>
   );

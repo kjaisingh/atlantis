@@ -8,21 +8,9 @@ const supabase = persistenceEnabled
   ? createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false } })
   : null;
 
-/**
- * Subscriptions are a best-effort convenience feature, not core functionality.
- * A flaky or misconfigured Supabase project must never block flight search -
- * every method here degrades to a fallback instead of throwing.
- */
-async function safeCall(action, fallback, run) {
-  if (!persistenceEnabled) {
-    return fallback;
-  }
-  try {
-    return await run();
-  } catch (err) {
-    console.error(`[db] ${action} failed:`, err.message);
-    return fallback;
-  }
+function requireClient() {
+  if (!supabase) throw new Error(getConfigError());
+  return supabase;
 }
 
 export function isEnabled() {
@@ -37,41 +25,36 @@ export function getConfigError() {
 }
 
 export async function addSubscription(subscription) {
-  return safeCall('addSubscription', null, async () => {
-    const { data, error } = await supabase
-      .from('subscriptions')
-      .insert(subscription)
-      .select()
-      .single();
-    if (error) throw error;
-    return data;
-  });
+  const { data, error } = await requireClient()
+    .from('subscriptions')
+    .insert(subscription)
+    .select('id, created_at')
+    .single();
+  if (error) throw error;
+  return data;
 }
 
 export async function getPendingSubscriptions() {
-  return safeCall('getPendingSubscriptions', [], async () => {
-    const { data, error } = await supabase
-      .from('subscriptions')
-      .select('*')
-      .is('notified_at', null);
-    if (error) throw error;
-    return data;
-  });
+  const { data, error } = await requireClient()
+    .from('subscriptions')
+    .select('*')
+    .is('notified_at', null);
+  if (error) throw error;
+  return data;
 }
 
 export async function markNotified(id) {
-  return safeCall('markNotified', null, async () => {
-    const { error } = await supabase
-      .from('subscriptions')
-      .update({ notified_at: new Date().toISOString() })
-      .eq('id', id);
-    if (error) throw error;
-  });
+  const { data, error } = await requireClient()
+    .from('subscriptions')
+    .update({ notified_at: new Date().toISOString() })
+    .eq('id', id)
+    .select('id')
+    .single();
+  if (error) throw error;
+  return data;
 }
 
 export async function deleteSubscription(id) {
-  return safeCall('deleteSubscription', null, async () => {
-    const { error } = await supabase.from('subscriptions').delete().eq('id', id);
-    if (error) throw error;
-  });
+  const { error } = await requireClient().from('subscriptions').delete().eq('id', id);
+  if (error) throw error;
 }

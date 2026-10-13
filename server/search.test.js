@@ -7,8 +7,24 @@ import { pinNonstopFirst } from './routes.js';
 // tests don't depend on the shape of live cache data.
 const DEST = 'ZZZ';
 
-function segment({ carrierCode, flightNumber, origin, destination, departureTime, arrivalTime, carrierName }) {
-  return { carrierCode, flightNumber, origin, destination, departureTime, arrivalTime, carrierName };
+function segment({
+  carrierCode,
+  flightNumber,
+  origin,
+  destination,
+  departureTime,
+  arrivalTime,
+  carrierName,
+}) {
+  return {
+    carrierCode,
+    flightNumber,
+    origin,
+    destination,
+    departureTime,
+    arrivalTime,
+    carrierName,
+  };
 }
 
 test('filterData collapses same flight, different fare brand, to the cheapest', () => {
@@ -129,7 +145,10 @@ test('pinNonstopFirst moves the first nonstop to the front and leaves other orde
 
   const result = pinNonstopFirst(itineraries);
 
-  assert.deepEqual(result.map((i) => i.id), [3, 1, 2, 4]);
+  assert.deepEqual(
+    result.map((i) => i.id),
+    [3, 1, 2, 4],
+  );
 });
 
 test('pinNonstopFirst is a no-op when no itinerary is a nonstop', () => {
@@ -140,7 +159,10 @@ test('pinNonstopFirst is a no-op when no itinerary is a nonstop', () => {
 
   const result = pinNonstopFirst(itineraries);
 
-  assert.deepEqual(result.map((i) => i.id), [1, 2]);
+  assert.deepEqual(
+    result.map((i) => i.id),
+    [1, 2],
+  );
 });
 
 test('pinNonstopFirst is a no-op when the nonstop is already first', () => {
@@ -151,7 +173,10 @@ test('pinNonstopFirst is a no-op when the nonstop is already first', () => {
 
   const result = pinNonstopFirst(itineraries);
 
-  assert.deepEqual(result.map((i) => i.id), [1, 2]);
+  assert.deepEqual(
+    result.map((i) => i.id),
+    [1, 2],
+  );
 });
 
 test('getBookingLink builds a Kayak URL with the route, date, party size, airline, and layover', () => {
@@ -159,7 +184,7 @@ test('getBookingLink builds a Kayak URL with the route, date, party size, airlin
 
   assert.equal(
     link,
-    'https://www.kayak.com/flights/JFK-ORD/2026-09-01/2adults?sort=price_a&fs=airlines=~AA;stops=~1;layoverair=DTW',
+    'https://www.kayak.com/flights/JFK-ORD/2026-09-01/2adults?sort=price_a&fs=airlines%3D~AA%3Bstops%3D~1%3Blayoverair%3DDTW',
   );
 });
 
@@ -168,6 +193,6 @@ test('getBookingLink handles a nonstop (no layovers)', () => {
 
   assert.equal(
     link,
-    'https://www.kayak.com/flights/JFK-ORD/2026-09-01/1adults?sort=price_a&fs=airlines=~AA;stops=~0;layoverair=',
+    'https://www.kayak.com/flights/JFK-ORD/2026-09-01/1adults?sort=price_a&fs=airlines%3D~AA%3Bstops%3D~0%3Blayoverair%3D',
   );
 });

@@ -2,10 +2,11 @@ import { useState } from 'react';
 import { AlertCircle, Bell, CheckCircle2, Mail } from 'lucide-react';
 import { subscribe } from '../lib/api.js';
 
-export default function SubscribeForm({ searchParams }) {
+export default function SubscribeForm({ searchParams, currencies }) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [priceThreshold, setPriceThreshold] = useState('');
+  const [currency, setCurrency] = useState(currencies[0]);
   const [status, setStatus] = useState(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -15,122 +16,126 @@ export default function SubscribeForm({ searchParams }) {
     setStatus(null);
     try {
       await subscribe({
+        ...searchParams,
         name,
         email,
-        origin: searchParams.origin,
-        destination: searchParams.destination,
-        departureDate: searchParams.departureDate,
-        returnDate: searchParams.returnDate,
-        travelers: searchParams.travelers,
         priceThreshold: Number(priceThreshold),
+        currency,
       });
-      setStatus({ type: 'success', message: "You're subscribed. We'll email you if the price drops." });
+      setStatus({
+        type: 'success',
+        message: "Price alert created. We'll email you after a matching fare is confirmed.",
+      });
       setName('');
       setEmail('');
       setPriceThreshold('');
-    } catch (err) {
-      setStatus({ type: 'error', message: err.message });
+    } catch (error) {
+      setStatus({ type: 'error', message: error.message });
     } finally {
       setSubmitting(false);
     }
   }
 
   return (
-    <div className="mx-auto mt-10 max-w-2xl px-4 sm:px-6">
-      <form
-        onSubmit={handleSubmit}
-        className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm sm:p-8"
-      >
-        <div className="flex items-center gap-2">
-          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-50 text-brand-600">
-            <Bell className="h-4 w-4" />
-          </span>
-          <h3 className="text-lg font-semibold text-slate-900">Get notified on a price drop</h3>
-        </div>
-        <p className="mt-1 text-sm text-slate-500">
-          We'll email you if this route drops below your target price.
-        </p>
-
-        <div className="mt-5 grid gap-4">
-          <div>
-            <label htmlFor="subscribeName" className="mb-1.5 block text-sm font-medium text-slate-700">
-              Name
-            </label>
-            <input
-              id="subscribeName"
-              type="text"
-              placeholder="Jane Doe"
-              required
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
-            />
-          </div>
-          <div>
-            <label htmlFor="subscribeEmail" className="mb-1.5 block text-sm font-medium text-slate-700">
-              Email
-            </label>
-            <div className="relative">
-              <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <input
-                id="subscribeEmail"
-                type="email"
-                placeholder="jane@example.com"
-                required
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-9 pr-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
-              />
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-4">
-          <label htmlFor="priceThreshold" className="mb-1.5 block text-sm font-medium text-slate-700">
-            Notify me below
-          </label>
-          <div className="relative">
-            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-500">
-              $
-            </span>
-            <input
-              id="priceThreshold"
-              type="number"
-              placeholder="300"
-              min="1"
-              step="0.01"
-              required
-              value={priceThreshold}
-              onChange={(event) => setPriceThreshold(event.target.value)}
-              className="w-full max-w-xs rounded-xl border border-slate-200 bg-white py-2.5 pl-7 pr-3 text-sm text-slate-900 shadow-sm outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
-            />
-          </div>
-        </div>
-
-        {status && (
-          <p
-            className={`mt-4 flex items-start gap-1.5 text-sm ${
-              status.type === 'success' ? 'text-emerald-600' : 'text-red-600'
-            }`}
-            role="alert"
-          >
-            {status.type === 'success' ? (
-              <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
-            ) : (
-              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-            )}
-            {status.message}
+    <form
+      onSubmit={handleSubmit}
+      className="mx-auto mt-8 rounded-3xl bg-slate-950 p-6 text-white shadow-xl sm:p-8"
+    >
+      <div className="flex items-center gap-3">
+        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 text-brand-200">
+          <Bell className="h-4 w-4" />
+        </span>
+        <div>
+          <h3 className="text-lg font-semibold">Watch this route</h3>
+          <p className="text-sm text-slate-400">
+            Threshold covers the whole search party
+            {searchParams.returnDate ? ' and both directions' : ''}.
           </p>
+        </div>
+      </div>
+      <div className="mt-5 grid gap-4 sm:grid-cols-2">
+        <label className="text-sm font-medium text-slate-200">
+          Name
+          <input
+            type="text"
+            required
+            maxLength="120"
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            className="dark-field mt-1.5"
+            autoComplete="name"
+          />
+        </label>
+        <label className="text-sm font-medium text-slate-200">
+          Email
+          <div className="relative mt-1.5">
+            <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+            <input
+              type="email"
+              required
+              maxLength="254"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              className="dark-field pl-9"
+              autoComplete="email"
+            />
+          </div>
+        </label>
+      </div>
+      <div className="mt-4 flex flex-wrap items-end gap-3">
+        <label className="text-sm font-medium text-slate-200">
+          Notify below
+          <input
+            type="number"
+            min="0.01"
+            max="1000000"
+            step="0.01"
+            required
+            value={priceThreshold}
+            onChange={(event) => setPriceThreshold(event.target.value)}
+            className="dark-field mt-1.5 w-44"
+          />
+        </label>
+        {currencies.length > 1 ? (
+          <label className="text-sm font-medium text-slate-200">
+            Currency
+            <select
+              value={currency}
+              onChange={(event) => setCurrency(event.target.value)}
+              className="dark-field mt-1.5 w-28"
+            >
+              {currencies.map((code) => (
+                <option key={code}>{code}</option>
+              ))}
+            </select>
+          </label>
+        ) : (
+          <span className="mb-3 text-sm font-semibold text-slate-300">{currency}</span>
         )}
-
-        <button
-          type="submit"
-          disabled={submitting}
-          className="mt-5 w-full rounded-xl bg-slate-900 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto sm:px-8"
+      </div>
+      {status && (
+        <p
+          role="status"
+          className={`mt-4 flex items-start gap-2 text-sm ${status.type === 'success' ? 'text-emerald-300' : 'text-red-300'}`}
         >
-          {submitting ? 'Subscribing…' : 'Subscribe'}
-        </button>
-      </form>
-    </div>
+          {status.type === 'success' ? (
+            <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+          ) : (
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+          )}
+          {status.message}
+        </p>
+      )}
+      <button
+        type="submit"
+        disabled={submitting}
+        className="mt-5 rounded-xl bg-white px-6 py-3 text-sm font-bold text-slate-950 transition hover:bg-brand-50 disabled:opacity-60"
+      >
+        {submitting ? 'Creating alert…' : 'Create price alert'}
+      </button>
+      <p className="mt-4 text-xs leading-5 text-slate-500">
+        We store your route and email only to send this alert. Alerts expire at departure.
+      </p>
+    </form>
   );
 }

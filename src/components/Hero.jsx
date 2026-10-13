@@ -20,8 +20,8 @@ export default function Hero() {
           </h1>
 
           <p className="mx-auto mt-5 max-w-xl text-lg text-slate-600 lg:mx-0">
-            Atlantis searches hidden-city itineraries: flights where your real destination is
-            just a layover on a cheaper ticket to somewhere further out.
+            Atlantis searches hidden-city itineraries: flights where your real destination is just a
+            layover on a cheaper ticket to somewhere further out.
           </p>
 
           <div className="mt-8 flex justify-center lg:justify-start">
@@ -46,16 +46,16 @@ export default function Hero() {
             <div className="mt-3 flex items-center gap-2 font-mono text-sm font-medium text-slate-700">
               <span>JFK</span>
               <Plane className="h-3.5 w-3.5 shrink-0 text-brand-500" />
-              <span>LHR</span>
+              <span>DTW</span>
             </div>
 
-            <p className="mt-4 text-3xl font-extrabold text-slate-900">$312</p>
+            <p className="mt-4 text-3xl font-extrabold text-slate-900">$188</p>
 
             <div className="my-4 border-t border-dashed border-slate-200" />
 
             <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-600">
               <TrendingDown className="h-3.5 w-3.5" />
-              Save $240 vs the direct fare
+              Save $126 vs the direct fare
             </span>
           </div>
         </div>

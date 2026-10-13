@@ -10,6 +10,7 @@ create table subscriptions (
   return_date date,
   num_travelers int not null default 1,
   price_threshold numeric not null,
+  currency text not null default 'USD' check (currency ~ '^[A-Z]{3}$'),
   created_at timestamptz not null default now(),
   notified_at timestamptz
 );
@@ -23,4 +24,5 @@ alter table subscriptions enable row level security;
 -- every 3 days directly inside Postgres so the project always shows activity,
 -- independent of whether the app server (Render) is awake.
 create extension if not exists pg_cron;
-select cron.schedule('keepalive', '0 0 */3 * *', $$ select 1 $$);
+select cron.unschedule(jobid) from cron.job where jobname = 'atlantis-keepalive';
+select cron.schedule('atlantis-keepalive', '0 0 */3 * *', $$ select 1 $$);

@@ -62,17 +62,18 @@ Open <http://localhost:5173>. Keep live API tokens in `.env`; never commit them.
 
 ### Environment variables
 
-| Variable                                           | Required             | Purpose                               |
-| -------------------------------------------------- | -------------------- | ------------------------------------- |
-| `PORT`                                             | No                   | Express port; defaults to `3000`.     |
-| `DUFFEL_API_KEY`                                   | For search           | Duffel test or live token.            |
-| `SUPABASE_URL`                                     | For alerts           | Supabase project URL.                 |
-| `SUPABASE_SERVICE_ROLE_KEY`                        | For alerts           | Server-only service-role key.         |
-| `SMTP_HOST`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` | For alerts           | SMTP delivery; all four are required. |
-| `SMTP_PORT`                                        | No                   | Defaults to `587`.                    |
-| `JOB_SECRET`                                       | For scheduled alerts | Shared secret for the job endpoint.   |
+| Variable                                           | Required             | Purpose                                                  |
+| -------------------------------------------------- | -------------------- | -------------------------------------------------------- |
+| `PORT`                                             | No                   | Express port; defaults to `3000`.                        |
+| `DUFFEL_API_KEY`                                   | For search           | Duffel test or live token.                               |
+| `SUPABASE_URL`                                     | For alerts           | Supabase project URL.                                    |
+| `SUPABASE_SERVICE_ROLE_KEY`                        | For alerts           | Server-only service-role key.                            |
+| `SUBSCRIPTION_SCHEMA_VERSION`                      | For alerts           | Set to `20261013` after applying the currency migration. |
+| `SMTP_HOST`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` | For alerts           | SMTP delivery; all four are required.                    |
+| `SMTP_PORT`                                        | No                   | Defaults to `587`.                                       |
+| `JOB_SECRET`                                       | For scheduled alerts | Shared secret for the job endpoint.                      |
 
-Alerts are enabled only when both Supabase values and all SMTP values are present. Missing SMTP never falls back to logging recipient data or marking an alert sent.
+Alerts require both Supabase values, all SMTP values, and the current schema version. Missing SMTP never falls back to logging recipient data or marking an alert sent.
 
 ## Database setup and migration
 
@@ -82,7 +83,7 @@ For a new project, run `supabase/schema.sql` in Supabase SQL Editor. Existing de
 supabase/migrations/20261013_add_subscription_currency.sql
 ```
 
-The default migration assigns `USD` to existing rows. Review or pause old alerts if their original currency is unknown before enabling scheduled delivery.
+The migration assigns `USD` to existing rows. Review or pause old alerts if their original currency is unknown. Then set `SUBSCRIPTION_SCHEMA_VERSION=20261013` in Render. Until then, search remains available and new alert creation stays safely disabled.
 
 ## Commands
 
@@ -108,7 +109,7 @@ The default migration assigns `USD` to existing rows. Review or pause old alerts
 - `GET /api/health`: status, deployed commit version, and enabled capabilities.
 - `GET /api/airports`: searchable airport and metro directory.
 - `POST /api/search`: validated flight search.
-- `POST /api/subscribe`: price-alert creation; disabled unless database and SMTP are ready.
+- `POST /api/subscribe`: price-alert creation; disabled unless database, SMTP, and schema are ready.
 - `POST /api/jobs/check-subscriptions`: secret-guarded scheduled delivery.
 
 Search accepts `{origin, destination, departureDate, returnDate?, travelers}`. Alert creation adds `{name, email, priceThreshold, currency}` and returns only an ID, timestamp, and status message—not stored PII.

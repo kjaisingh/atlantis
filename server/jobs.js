@@ -33,8 +33,9 @@ async function processSubscriptions() {
     checked += 1;
 
     try {
+      const currency = subscription.currency || 'USD';
       if (isExpired(subscription)) {
-        await sendExpiredEmail(subscription);
+        await sendExpiredEmail({ ...subscription, currency });
         await db.deleteSubscription(subscription.id);
         continue;
       }
@@ -44,7 +45,7 @@ async function processSubscriptions() {
         subscription.destination,
         subscription.departure_date,
         subscription.num_travelers,
-        subscription.currency,
+        currency,
       );
 
       if (!outbound) {
@@ -60,7 +61,7 @@ async function processSubscriptions() {
           subscription.origin,
           subscription.return_date,
           subscription.num_travelers,
-          subscription.currency,
+          currency,
         );
         if (!inbound) {
           continue;
@@ -70,7 +71,7 @@ async function processSubscriptions() {
 
       if (totalPrice <= subscription.price_threshold) {
         matched += 1;
-        await sendPriceAlertEmail(subscription, outbound, inbound, totalPrice);
+        await sendPriceAlertEmail({ ...subscription, currency }, outbound, inbound, totalPrice);
         await db.markNotified(subscription.id);
       }
     } catch (err) {

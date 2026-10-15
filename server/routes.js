@@ -151,23 +151,5 @@ export function createRoutes({ config, database, jobRunner, searchFlights }) {
     }
   });
 
-  router.post('/keepalive', async (request, response) => {
-    if (!secretMatches(request.headers['x-job-secret'], process.env.JOB_SECRET)) {
-      response.status(401).json({ error: 'Unauthorized.' });
-      return;
-    }
-    if (!database.isEnabled()) {
-      response.status(503).json({ database: 'not configured' });
-      return;
-    }
-    try {
-      await database.ping();
-      response.json({ database: 'reachable' });
-    } catch (error) {
-      console.error('[routes] database keepalive failed:', error.message);
-      response.status(503).json({ database: 'unavailable' });
-    }
-  });
-
   return router;
 }

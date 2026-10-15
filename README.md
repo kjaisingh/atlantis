@@ -39,8 +39,16 @@ Hidden-city travel carries risks: checked bags may continue to the ticketed dest
    npm run dev
    ```
 
-4. To enable price alerts, create a Supabase project and run [`supabase/schema.sql`](supabase/schema.sql) in its SQL Editor. Set the Supabase and SMTP values, `SUBSCRIPTIONS_ENABLED=true`, and `JOB_SECRET`. Add `ATLANTIS_URL` and `JOB_SECRET` as GitHub Actions secrets for scheduled delivery.
+4. To enable price alerts, create a Supabase project and run [`supabase/schema.sql`](supabase/schema.sql) in its SQL Editor. Set the Supabase and SMTP values, `SUBSCRIPTIONS_ENABLED=true`, and `JOB_SECRET`. Add `ATLANTIS_URL` and `JOB_SECRET` as GitHub Actions secrets for scheduled delivery. Run [`supabase/keepalive.sql`](supabase/keepalive.sql) for the direct database keepalive below.
 5. Deploy with the [Render Blueprint](render.yaml), setting `DUFFEL_API_KEY` and any optional alert values there.
+
+## Supabase keepalive
+
+Run [`supabase/keepalive.sql`](supabase/keepalive.sql) after the application schema. It creates a fixed, non-sensitive row with an anonymous read policy limited to that row.
+
+The enabled [cron-job.org](https://console.cron-job.org/jobs) job `Atlantis Supabase keepalive (goecceiqpounqrvuispw)` sends a GET request to `https://goecceiqpounqrvuispw.supabase.co/rest/v1/keepalive?select=id&limit=1` every six hours in `America/New_York` (`15 */6 * * *`). Set its `apikey` header to this project's Supabase publishable key. Save responses and enable failure, recovery, and disabled-job notifications. A test run should return HTTP 200 with `[{"id":1}]`.
+
+This request reaches Supabase directly, even when the Render service is asleep. Monitor failed runs; free-tier activity does not guarantee uninterrupted availability.
 
 ## Feature backlog
 

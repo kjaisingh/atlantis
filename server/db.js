@@ -24,15 +24,6 @@ export function getConfigError() {
   return 'Subscriptions are not configured. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY to enable them.';
 }
 
-export async function ping() {
-  const { error } = await requireClient()
-    .from('subscriptions')
-    .select('id')
-    .limit(1)
-    .abortSignal(AbortSignal.timeout(10_000));
-  if (error) throw error;
-}
-
 export async function addSubscription(subscription) {
   const { data, error } = await requireClient()
     .from('subscriptions')

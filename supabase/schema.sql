@@ -19,9 +19,3 @@ alter table subscriptions enable row level security;
 -- No policies are defined: the server only ever talks to Supabase with the
 -- service_role key, which bypasses RLS. This table is intentionally
 -- unreachable from anon/authenticated clients.
-
--- Additional database activity between external keepalive checks. Neither this
--- job nor a free-tier scheduler guarantees that the project will stay online.
-create extension if not exists pg_cron;
-select cron.unschedule(jobid) from cron.job where jobname = 'atlantis-keepalive';
-select cron.schedule('atlantis-keepalive', '17 3 */3 * *', $$ select count(*) from public.subscriptions $$);

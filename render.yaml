@@ -18,7 +18,7 @@ services:
         sync: false
       - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false
-      - key: SUBSCRIPTION_SCHEMA_VERSION
+      - key: SUBSCRIPTIONS_ENABLED
         sync: false
       - key: SMTP_HOST
         sync: false

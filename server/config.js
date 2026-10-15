@@ -15,7 +15,7 @@ export function loadConfig(env = process.env) {
 
   const persistenceEnabled = optionalGroup(env, ['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY']);
   const emailEnabled = optionalGroup(env, ['SMTP_HOST', 'SMTP_USER', 'SMTP_PASS', 'SMTP_FROM']);
-  const subscriptionSchemaReady = env.SUBSCRIPTION_SCHEMA_VERSION === '20261013';
+  const subscriptionsRequested = env.SUBSCRIPTIONS_ENABLED === 'true';
 
   return {
     port,
@@ -24,7 +24,6 @@ export function loadConfig(env = process.env) {
     duffelConfigured: Boolean(env.DUFFEL_API_KEY),
     persistenceEnabled,
     emailEnabled,
-    subscriptionSchemaReady,
-    subscriptionsEnabled: persistenceEnabled && emailEnabled && subscriptionSchemaReady,
+    subscriptionsEnabled: persistenceEnabled && emailEnabled && subscriptionsRequested,
   };
 }

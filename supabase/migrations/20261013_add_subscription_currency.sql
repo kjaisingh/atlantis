@@ -1,3 +1,4 @@
+-- Review existing subscriptions before this script assigns their currency to USD.
 alter table public.subscriptions
   add column if not exists currency text not null default 'USD';
 

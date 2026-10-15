@@ -11,11 +11,10 @@ const alertEnvironment = {
   SMTP_FROM: 'Atlantis <alerts@example.com>',
 };
 
-test('new alerts remain disabled until the current schema is confirmed', () => {
+test('price alerts require explicit opt-in', () => {
   assert.equal(loadConfig(alertEnvironment).subscriptionsEnabled, false);
   assert.equal(
-    loadConfig({ ...alertEnvironment, SUBSCRIPTION_SCHEMA_VERSION: '20261013' })
-      .subscriptionsEnabled,
+    loadConfig({ ...alertEnvironment, SUBSCRIPTIONS_ENABLED: 'true' }).subscriptionsEnabled,
     true,
   );
 });

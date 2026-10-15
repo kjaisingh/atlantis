@@ -1,19 +1,51 @@
 # Atlantis
 
-Atlantis helps compare ordinary nonstop fares with hidden-city itineraries: flights whose connection is the city you intend to visit. It shows matching Kayak searches; it does not book tickets or handle payment.
+Atlantis compares ordinary nonstop fares with hidden-city itineraries, where the intended destination is a connection. It links to matching Kayak searches for booking and does not handle tickets or payment. [Open Atlantis](https://atlantis-xoxe.onrender.com).
 
-[Open Atlantis](https://atlantis-xoxe.onrender.com) · [Build status](https://github.com/kjaisingh/atlantis/actions/workflows/build.yml)
+Hidden-city travel carries risks: checked bags may continue to the ticketed destination, skipping a leg can cancel later legs, and rerouting or transit rules may make an itinerary unusable. Confirm the final fare and terms before booking.
 
-## Use it
+## Features
 
-Choose origin, destination, travel date, and number of travelers. Review prices, route, departure time, and whether each result is nonstop or hidden-city. Filter or sort results, then open the matching Kayak search to check the final itinerary and fare. Round trips are shown as separate outbound and inbound searches.
+- Search one-way or round-trip flights by airport or metro area and traveler count.
+- Compare nonstop and hidden-city routes; filter or sort by price, route, and departure time.
+- Keep currencies separate and label partial results when provider requests fail or search coverage is limited.
+- Open a matching Kayak search to check the current itinerary and price.
+- Optionally receive email price alerts when Supabase and SMTP delivery are configured.
 
-Search covers a bounded number of flight combinations, so results are not guaranteed exhaustive. Atlantis labels partial results when a provider request fails or the search budget cuts off candidates. Prices are compared only within the same currency. Price alerts appear only when database and email delivery are configured; they are currently unavailable on the live app.
+## Architecture
 
-## Before booking
+- React and Vite provide the client; Express serves the API and built app on Render.
+- The API validates requests, plans a bounded set of routes from airport and candidate data, and queries Duffel.
+- Search results are normalized, deduplicated, and grouped by currency.
+- Optional Supabase Postgres stores price subscriptions; SMTP sends matching alerts from a scheduled job.
 
-Hidden-city tickets carry real risks. Checked bags usually continue to the ticketed destination; skipping a leg can cancel all later legs on that ticket. Airlines may reroute connections or apply fare-rule and loyalty-account restrictions. Check visa, transit, and entry rules for every airport. Confirm current price and terms on the booking site before purchase.
+## Setup
 
-Maintainer setup, deployment, and database procedures: [operations guide](docs/operations.md).
+1. Install Node.js 22 or newer and get a Duffel API token. Install dependencies.
 
-MIT licensed: [LICENSE](LICENSE).
+   ```bash
+   npm ci
+   ```
+
+2. Copy [`.env.example`](.env.example) to `.env` and set `DUFFEL_API_KEY`.
+
+   ```bash
+   cp .env.example .env
+   ```
+
+3. Start the local app at <http://localhost:5173>.
+
+   ```bash
+   npm run dev
+   ```
+
+4. To enable price alerts, create a Supabase project and run [`supabase/schema.sql`](supabase/schema.sql) in its SQL Editor. Set the Supabase values, `SUBSCRIPTION_SCHEMA_VERSION=20261013`, SMTP values, and `JOB_SECRET`. Add `ATLANTIS_URL` and `JOB_SECRET` as GitHub Actions secrets for scheduled delivery.
+5. Deploy with the [Render Blueprint](render.yaml), setting `DUFFEL_API_KEY` and any optional alert values there. See the [operations guide](docs/operations.md) for ongoing maintenance and data safety.
+
+## Feature backlog
+
+- Refresh route candidates automatically and expand search coverage.
+- Add a second fare provider for comparison and failover.
+- Show more fare-rule and transit details before users leave for booking.
+- Add saved searches, alert management, and price history.
+- Queue provider and email work, with monitoring and independent database backups.

@@ -33,9 +33,11 @@ if (!process.env.SMOKE_URL) {
 const browser = await chromium.launch();
 const failures = [];
 
-function monitor(page, label) {
+function monitor(page, label, isExpectedConsoleError = () => false) {
   page.on('console', (message) => {
-    if (message.type() === 'error') failures.push(`${label} console: ${message.text()}`);
+    if (message.type() === 'error' && !isExpectedConsoleError(message)) {
+      failures.push(`${label} console: ${message.text()}`);
+    }
   });
   page.on('pageerror', (error) => failures.push(`${label} page: ${error.message}`));
   page.on('requestfailed', (request) =>
@@ -43,14 +45,14 @@ function monitor(page, label) {
   );
 }
 
-async function mockApi(page) {
+async function mockApi(page, subscriptions = true) {
   if (live) return;
   await page.route('**/api/health', (route) =>
     route.fulfill({
       json: {
         status: 'ok',
         version: 'smoke',
-        capabilities: { search: true, subscriptions: true },
+        capabilities: { search: true, subscriptions, databaseConfigured: true },
       },
     }),
   );
@@ -111,7 +113,12 @@ async function mockApi(page) {
 async function runDesktop() {
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const page = await context.newPage();
-  monitor(page, 'desktop');
+  let expectSearchFailure = false;
+  monitor(
+    page,
+    'desktop',
+    (message) => expectSearchFailure && message.text().includes('502 (Bad Gateway)'),
+  );
   await mockApi(page);
   await page.goto(baseUrl, { waitUntil: 'networkidle' });
   await page.screenshot({ path: `${outDir}/landing-desktop.png`, fullPage: true });
@@ -126,6 +133,18 @@ async function runDesktop() {
   await page.locator('a').filter({ hasText: 'Hidden-city' }).waitFor();
   await page.getByRole('heading', { name: 'Watch this route' }).waitFor();
   await page.screenshot({ path: `${outDir}/results-desktop.png`, fullPage: true });
+  if (!live) {
+    expectSearchFailure = true;
+    await page.route('**/api/search', (route) =>
+      route.fulfill({ status: 502, json: { error: 'Search temporarily unavailable.' } }),
+    );
+    await page.getByRole('button', { name: 'Search flights' }).click();
+    await page.getByText('Search temporarily unavailable.').waitFor();
+    if (await page.getByText('$188.00').count()) {
+      throw new Error('Stale search results remained after a failed retry.');
+    }
+    expectSearchFailure = false;
+  }
   await context.close();
 }
 
@@ -141,9 +160,31 @@ async function runMobile() {
   await context.close();
 }
 
+async function runDisabledAlerts() {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const page = await context.newPage();
+  monitor(page, 'alerts-disabled');
+  await mockApi(page, false);
+  await page.goto(baseUrl, { waitUntil: 'networkidle' });
+  await page.getByRole('combobox', { name: 'Origin' }).fill('JFK');
+  await page.getByRole('option', { name: /JFK/ }).click();
+  await page.getByRole('combobox', { name: 'Destination' }).fill('DTW');
+  await page.getByRole('option', { name: /DTW/ }).click();
+  await page.locator('#departureDate').fill('2099-02-28');
+  await page.getByRole('button', { name: 'Search flights' }).click();
+  await page.getByText('$188.00').waitFor();
+  await page.screenshot({ path: `${outDir}/alerts-disabled-mobile.png`, fullPage: true });
+  await page.getByText('Price alerts are unavailable right now.', { exact: false }).waitFor();
+  if (await page.getByRole('heading', { name: 'Watch this route' }).count()) {
+    throw new Error('Alert form appeared while subscriptions are disabled.');
+  }
+  await context.close();
+}
+
 try {
   await runDesktop();
   await runMobile();
+  if (!live) await runDisabledAlerts();
   if (failures.length) throw new Error(failures.join('\n'));
   console.log(`Smoke test passed. Screenshots: ${outDir}`);
 } finally {

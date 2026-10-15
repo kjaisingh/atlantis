@@ -23,7 +23,7 @@ function calendarDate(value) {
 }
 
 export function todayUtc(now = new Date()) {
-  return new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
 }
 
 export function isValidFutureDate(value, now = new Date()) {

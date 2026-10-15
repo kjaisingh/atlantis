@@ -1,11 +1,32 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { filterData, getBookingLink } from './search.js';
+import { filterData, filterJSONResult, getBookingLink } from './search.js';
 import { pinNonstopFirst } from './routes.js';
 
 // dest kept out of lookup-map.json's real metro groupings on purpose, so these
 // tests don't depend on the shape of live cache data.
 const DEST = 'ZZZ';
+
+test('malformed Duffel offers are skipped without hiding usable offers', () => {
+  const valid = {
+    total_amount: '135.00',
+    total_currency: 'USD',
+    slices: [
+      {
+        segments: [
+          {
+            origin: { iata_code: 'JFK' },
+            destination: { iata_code: DEST },
+            marketing_carrier: { iata_code: 'AA', name: 'Airline' },
+            departing_at: '2027-01-01T10:00:00',
+            arriving_at: '2027-01-01T12:00:00',
+          },
+        ],
+      },
+    ],
+  };
+  assert.deepEqual(filterJSONResult([null, {}, { ...valid, slices: [] }, valid], DEST), [valid]);
+});
 
 function segment({
   carrierCode,

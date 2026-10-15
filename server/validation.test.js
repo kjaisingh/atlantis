@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { isValidFutureDate, validateSubscriber, validateTrip } from './validation.js';
+import { isValidFutureDate, todayUtc, validateSubscriber, validateTrip } from './validation.js';
 
 const now = new Date('2026-10-13T12:00:00Z');
 const airports = new Set(['JFK', 'DTW']);
@@ -10,6 +10,12 @@ test('date validation rejects rollover dates and past dates', () => {
   assert.equal(isValidFutureDate('2026-02-30', now), false);
   assert.equal(isValidFutureDate('2026-10-12', now), false);
   assert.equal(isValidFutureDate('2026-10-13', now), true);
+});
+test('today uses UTC calendar date at timezone boundaries', () => {
+  assert.equal(
+    todayUtc(new Date('2026-10-13T23:30:00Z')).toISOString(),
+    '2026-10-13T00:00:00.000Z',
+  );
 });
 
 test('trip validation normalizes airport codes and numeric travelers', () => {

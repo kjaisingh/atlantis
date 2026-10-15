@@ -11,6 +11,7 @@
 # production output
 /build
 /dist
+/supabase/.temp/
 
 # browser tests
 /playwright-report

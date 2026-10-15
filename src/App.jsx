@@ -12,8 +12,9 @@ import { getAirports, getHealth, searchFlights } from './lib/api.js';
 
 export default function App() {
   const [airports, setAirports] = useState([]);
-  const [capabilities, setCapabilities] = useState({ search: true, subscriptions: false });
+  const [capabilities, setCapabilities] = useState({ search: false, subscriptions: false });
   const [directoryError, setDirectoryError] = useState(null);
+  const [serviceError, setServiceError] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [results, setResults] = useState(null);
@@ -23,13 +24,19 @@ export default function App() {
     Promise.allSettled([getAirports(), getHealth()]).then(([airportResult, healthResult]) => {
       if (airportResult.status === 'fulfilled') setAirports(airportResult.value);
       else setDirectoryError('Airport directory failed to load. Refresh to try again.');
-      if (healthResult.status === 'fulfilled') setCapabilities(healthResult.value.capabilities);
+      if (healthResult.status === 'fulfilled' && healthResult.value.capabilities?.search) {
+        setCapabilities(healthResult.value.capabilities);
+      } else {
+        setServiceError('Flight search is unavailable right now. Please try again later.');
+      }
     });
   }, []);
 
   async function handleSearch(params) {
     setLoading(true);
     setError(null);
+    setResults(null);
+    setSearchParams(null);
     try {
       const response = await searchFlights(params);
       setResults(response);
@@ -63,6 +70,11 @@ export default function App() {
         />
 
         <div aria-live="polite" className="mx-auto max-w-3xl px-4 sm:px-6">
+          {serviceError && (
+            <p className="mt-5 flex items-center justify-center gap-2 text-sm font-medium text-red-700">
+              <AlertCircle className="h-4 w-4" /> {serviceError}
+            </p>
+          )}
           {directoryError && (
             <p className="mt-5 flex items-center justify-center gap-2 text-sm font-medium text-red-700">
               <AlertCircle className="h-4 w-4" /> {directoryError}
@@ -114,6 +126,12 @@ export default function App() {
                 searchParams={searchParams}
                 currencies={alertCurrencies}
               />
+            )}
+            {!capabilities.subscriptions && (
+              <p className="mt-8 text-center text-sm text-slate-600">
+                Price alerts are unavailable right now. You can still compare flights and open
+                booking searches.
+              </p>
             )}
           </section>
         )}

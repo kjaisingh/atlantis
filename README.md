@@ -39,8 +39,8 @@ Hidden-city travel carries risks: checked bags may continue to the ticketed dest
    npm run dev
    ```
 
-4. To enable price alerts, create a Supabase project and run [`supabase/schema.sql`](supabase/schema.sql) in its SQL Editor. Set the Supabase values, `SUBSCRIPTION_SCHEMA_VERSION=20261013`, SMTP values, and `JOB_SECRET`. Add `ATLANTIS_URL` and `JOB_SECRET` as GitHub Actions secrets for scheduled delivery.
-5. Deploy with the [Render Blueprint](render.yaml), setting `DUFFEL_API_KEY` and any optional alert values there. See the [operations guide](docs/operations.md) for ongoing maintenance and data safety.
+4. To enable price alerts, create a Supabase project and run [`supabase/schema.sql`](supabase/schema.sql) in its SQL Editor. Set the Supabase and SMTP values, `SUBSCRIPTIONS_ENABLED=true`, and `JOB_SECRET`. Add `ATLANTIS_URL` and `JOB_SECRET` as GitHub Actions secrets for scheduled delivery.
+5. Deploy with the [Render Blueprint](render.yaml), setting `DUFFEL_API_KEY` and any optional alert values there.
 
 ## Feature backlog
 

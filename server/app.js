@@ -59,6 +59,7 @@ export function createApp({
       capabilities: {
         search: config.duffelConfigured,
         subscriptions: config.subscriptionsEnabled,
+        databaseConfigured: config.persistenceEnabled,
       },
     });
   });

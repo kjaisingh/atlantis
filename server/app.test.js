@@ -5,6 +5,7 @@ import { createApp } from './app.js';
 const config = {
   commitSha: 'test-sha',
   duffelConfigured: true,
+  persistenceEnabled: false,
   subscriptionsEnabled: false,
 };
 const database = { isEnabled: () => false };
@@ -31,8 +32,66 @@ test('health exposes safe capabilities and deployment version', async () => {
   assert.deepEqual(await response.json(), {
     status: 'ok',
     version: 'test-sha',
-    capabilities: { search: true, subscriptions: false },
+    capabilities: { search: true, subscriptions: false, databaseConfigured: false },
   });
+});
+test('keepalive is authenticated and fails closed without a database', async () => {
+  const unauthorized = await fetch(`${baseUrl}/api/keepalive`, { method: 'POST' });
+  assert.equal(unauthorized.status, 401);
+
+  const previousSecret = process.env.JOB_SECRET;
+  process.env.JOB_SECRET = 'test-job-secret';
+  try {
+    const unavailable = await fetch(`${baseUrl}/api/keepalive`, {
+      method: 'POST',
+      headers: { 'x-job-secret': 'test-job-secret' },
+    });
+    assert.equal(unavailable.status, 503);
+    assert.deepEqual(await unavailable.json(), { database: 'not configured' });
+
+    const disabledJob = await fetch(`${baseUrl}/api/jobs/check-subscriptions`, {
+      method: 'POST',
+      headers: { 'x-job-secret': 'test-job-secret' },
+    });
+    assert.equal(disabledJob.status, 503);
+  } finally {
+    if (previousSecret === undefined) delete process.env.JOB_SECRET;
+    else process.env.JOB_SECRET = previousSecret;
+  }
+});
+test('keepalive reports database reachability without exposing records', async () => {
+  const previousSecret = process.env.JOB_SECRET;
+  process.env.JOB_SECRET = 'test-job-secret';
+  let reachable = true;
+  const app = createApp({
+    config: { ...config, persistenceEnabled: true },
+    database: {
+      isEnabled: () => true,
+      ping: async () => {
+        if (!reachable) throw new Error('database unavailable');
+      },
+    },
+    jobRunner,
+    searchFlights,
+  });
+  const keepaliveServer = app.listen(0);
+  await new Promise((resolve) => keepaliveServer.once('listening', resolve));
+  const url = `http://127.0.0.1:${keepaliveServer.address().port}/api/keepalive`;
+  try {
+    const headers = { 'x-job-secret': 'test-job-secret' };
+    const healthy = await fetch(url, { method: 'POST', headers });
+    assert.equal(healthy.status, 200);
+    assert.deepEqual(await healthy.json(), { database: 'reachable' });
+
+    reachable = false;
+    const failed = await fetch(url, { method: 'POST', headers });
+    assert.equal(failed.status, 503);
+    assert.deepEqual(await failed.json(), { database: 'unavailable' });
+  } finally {
+    await new Promise((resolve) => keepaliveServer.close(resolve));
+    if (previousSecret === undefined) delete process.env.JOB_SECRET;
+    else process.env.JOB_SECRET = previousSecret;
+  }
 });
 
 test('invalid JSON and impossible dates return 400', async () => {

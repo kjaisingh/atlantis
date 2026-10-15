@@ -1,0 +1,31 @@
+name: Database keepalive
+
+on:
+  schedule:
+    - cron: '17 4 */2 * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: atlantis-database-keepalive
+  cancel-in-progress: false
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check database through app
+        env:
+          ATLANTIS_URL: ${{ secrets.ATLANTIS_URL }}
+          JOB_SECRET: ${{ secrets.JOB_SECRET }}
+        run: |
+          test -n "$ATLANTIS_URL"
+          test -n "$JOB_SECRET"
+          response="$(curl --fail-with-body --silent --show-error \
+            --retry 2 --retry-all-errors --max-time 180 \
+            -X POST "${ATLANTIS_URL}/api/keepalive" \
+            -H "x-job-secret: ${JOB_SECRET}")"
+          node -e 'const body = JSON.parse(process.argv[1]); if (body.database !== "reachable") process.exit(1); console.log("Database reachable.");' "$response"

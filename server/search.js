@@ -171,9 +171,25 @@ export function OneWayFilterItems(offer, sliceIndex) {
 
 export function filterJSONResult(offers, destination) {
   const destinationCodes = lookupMap[destination] ?? [destination];
-  return offers.filter((offer) =>
-    offer.slices[0].segments.some((segment) =>
-      destinationCodes.includes(segment.destination.iata_code),
-    ),
-  );
+  if (!Array.isArray(offers)) return [];
+  return offers.filter((offer) => {
+    const segments = offer?.slices?.[0]?.segments;
+    return (
+      Number.isFinite(Number(offer?.total_amount)) &&
+      Number(offer.total_amount) > 0 &&
+      /^[A-Z]{3}$/.test(offer?.total_currency ?? '') &&
+      Array.isArray(segments) &&
+      segments.length > 0 &&
+      segments.every(
+        (segment) =>
+          typeof segment?.origin?.iata_code === 'string' &&
+          typeof segment?.destination?.iata_code === 'string' &&
+          typeof segment?.marketing_carrier?.iata_code === 'string' &&
+          typeof segment?.marketing_carrier?.name === 'string' &&
+          typeof segment?.departing_at === 'string' &&
+          typeof segment?.arriving_at === 'string',
+      ) &&
+      segments.some((segment) => destinationCodes.includes(segment.destination.iata_code))
+    );
+  });
 }

@@ -89,18 +89,18 @@ The migration assigns `USD` to existing rows. Review or pause old alerts if thei
 
 ## Commands
 
-| Command                 | Purpose                                                  |
-| ----------------------- | -------------------------------------------------------- |
-| `npm run dev`           | Run Vite and Express with API proxying.                  |
-| `npm test`              | Run server unit and integration tests.                   |
-| `npm run validate:data` | Validate airport, metro, and cache contracts.            |
-| `npm run lint`          | Run ESLint.                                              |
-| `npm run format:check`  | Verify Prettier formatting.                              |
-| `npm run build`         | Build production assets into `dist/`.                    |
-| `npm run test:e2e`      | Run deterministic desktop/mobile Playwright smoke tests. |
-| `npm run check`         | Run formatting, lint, data, tests, and build.            |
+| Command                 | Purpose                                              |
+| ----------------------- | ---------------------------------------------------- |
+| `npm run dev`           | Run Vite and Express with API proxying.              |
+| `npm test`              | Run server unit and integration tests.               |
+| `npm run validate:data` | Validate airport, metro, and cache contracts.        |
+| `npm run lint`          | Run ESLint.                                          |
+| `npm run format:check`  | Verify Prettier formatting.                          |
+| `npm run build`         | Build production assets into `dist/`.                |
+| `npm run test:e2e`      | Build and run desktop/mobile Playwright smoke tests. |
+| `npm run check`         | Run formatting, lint, data, tests, and build.        |
 
-`npm run test:e2e` starts a local production server and intercepts API calls with deterministic fixtures. Set `SMOKE_URL` to test an already-running deployment. Set `SMOKE_LIVE=1` only for an intentional live Duffel check.
+`npm run test:e2e` builds fresh assets, starts a local production server, and intercepts API calls with deterministic fixtures. Set `SMOKE_URL` to test an already-running deployment. Set `SMOKE_LIVE=1` only for an intentional live Duffel check: it sends one real search through the provider. A local live check also requires `DUFFEL_API_KEY`.
 
 ## Data maintenance
 

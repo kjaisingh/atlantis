@@ -17,7 +17,7 @@
     "lint": "eslint .",
     "validate:data": "node scripts/validate-data.mjs",
     "test": "node --test server/*.test.js",
-    "test:e2e": "node scripts/smoke-test.mjs"
+    "test:e2e": "npm run build && node scripts/smoke-test.mjs"
   },
   "repository": {
     "type": "git",

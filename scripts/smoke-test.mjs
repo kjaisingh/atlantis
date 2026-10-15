@@ -6,6 +6,9 @@ const port = 4173;
 const baseUrl = process.env.SMOKE_URL || `http://127.0.0.1:${port}`;
 const outDir = process.env.SMOKE_OUT || '/tmp/atlantis-smoke';
 const live = process.env.SMOKE_LIVE === '1';
+if (live && !process.env.SMOKE_URL && !process.env.DUFFEL_API_KEY) {
+  throw new Error('SMOKE_LIVE=1 requires DUFFEL_API_KEY for a local server, or SMOKE_URL.');
+}
 await mkdir(outDir, { recursive: true });
 
 let server;
@@ -14,7 +17,7 @@ if (!process.env.SMOKE_URL) {
     env: {
       ...process.env,
       PORT: String(port),
-      DUFFEL_API_KEY: 'smoke-test-only',
+      DUFFEL_API_KEY: live ? process.env.DUFFEL_API_KEY : 'smoke-test-only',
       NODE_ENV: 'test',
     },
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -122,6 +125,30 @@ async function runDesktop() {
   await mockApi(page);
   await page.goto(baseUrl, { waitUntil: 'networkidle' });
   await page.screenshot({ path: `${outDir}/landing-desktop.png`, fullPage: true });
+
+  if (live) {
+    const departureDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .slice(0, 10);
+    const response = await fetch(`${baseUrl}/api/search`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      signal: AbortSignal.timeout(120_000),
+      body: JSON.stringify({
+        origin: 'JFK',
+        destination: 'DTW',
+        departureDate,
+        travelers: 1,
+      }),
+    });
+    if (!response.ok) throw new Error(`Live flight search returned ${response.status}.`);
+    const result = await response.json();
+    if (!Array.isArray(result.outbound) || result.meta?.outbound?.succeeded < 1) {
+      throw new Error('Live flight search returned no successful provider requests.');
+    }
+    await context.close();
+    return;
+  }
 
   await page.getByRole('combobox', { name: 'Origin' }).fill('JFK');
   await page.getByRole('option', { name: /JFK/ }).click();

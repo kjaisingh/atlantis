@@ -78,8 +78,8 @@ async function mockApi(page, subscriptions = true) {
             currency: 'USD',
             nonstop: true,
             isHiddenCity: false,
-            departureTime: '2099-02-28T08:00:00Z',
-            arrivalTime: '2099-02-28T10:00:00Z',
+            departureTime: '2099-02-28T07:00:00Z',
+            arrivalTime: '2099-02-28T09:00:00Z',
             bookingLink: 'https://example.com/direct',
           },
           {
@@ -158,6 +158,16 @@ async function runDesktop() {
   await page.getByRole('button', { name: 'Search flights' }).click();
   await page.getByText('$188.00').waitFor();
   await page.locator('a').filter({ hasText: 'Hidden-city' }).waitFor();
+  await page.getByRole('combobox', { name: 'Sort' }).selectOption('departure');
+  const direct = page.locator('a[href="https://example.com/direct"]');
+  const hidden = page.locator('a[href="https://example.com/hidden"]');
+  if (await direct.getByText('Lowest price').count()) {
+    throw new Error('Departure sort marked the higher fare as lowest price.');
+  }
+  if ((await hidden.getByText('Lowest price').count()) !== 1) {
+    throw new Error('Departure sort lost the lowest-price badge.');
+  }
+  await page.getByText('Save $126.00 versus the $314.00 nonstop fare').waitFor();
   await page.getByRole('heading', { name: 'Watch this route' }).waitFor();
   await page.screenshot({ path: `${outDir}/results-desktop.png`, fullPage: true });
   if (!live) {

@@ -44,7 +44,10 @@ export default function ResultsTable({ title, itineraries, meta }) {
     );
   }, [currency, itineraries, kind, sort]);
 
-  const cheapest = visible[0] ?? null;
+  const cheapest = visible.reduce(
+    (lowest, item) => (!lowest || Number(item.price) < Number(lowest.price) ? item : lowest),
+    null,
+  );
   const directPrice = Math.min(
     ...itineraries
       .filter((item) => item.currency === currency && item.nonstop)
@@ -113,11 +116,11 @@ export default function ResultsTable({ title, itineraries, meta }) {
 
       {visible.length === 0 ? (
         <p className="py-10 text-center text-sm text-slate-500">
-          No matching itineraries for these filters.
+          No itineraries match these filters.
         </p>
       ) : (
         <div className="mt-4 space-y-3">
-          {visible.map((itinerary, index) => (
+          {visible.map((itinerary) => (
             <a
               key={`${itinerary.path}|${itinerary.departureTime}|${itinerary.price}|${itinerary.currency}`}
               href={itinerary.bookingLink}
@@ -132,7 +135,7 @@ export default function ResultsTable({ title, itineraries, meta }) {
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="font-semibold text-slate-950">{itinerary.airline}</span>
-                    {index === 0 && (
+                    {itinerary === cheapest && (
                       <Badge className="bg-brand-50 text-brand-700">Lowest price</Badge>
                     )}
                     {itinerary.nonstop && (

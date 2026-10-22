@@ -6,6 +6,21 @@ const lookupMap = JSON.parse(readFileSync(new URL('./data/lookup-map.json', impo
 const cacheIndex = new Map(cacheTable.map((entry) => [`${entry.X}:${entry.Y}`, entry.Z]));
 export const MAX_FANOUT_REQUESTS = 4;
 
+function interleaveOrigins(requests) {
+  const groups = new Map();
+  for (const request of requests) {
+    if (!groups.has(request.origin)) groups.set(request.origin, []);
+    groups.get(request.origin).push(request);
+  }
+  const ordered = [];
+  for (let index = 0; ordered.length < requests.length; index += 1) {
+    for (const group of groups.values()) {
+      if (group[index]) ordered.push(group[index]);
+    }
+  }
+  return ordered;
+}
+
 export function planRequests(origin, destination, limit = MAX_FANOUT_REQUESTS) {
   const origins = lookupMap[origin] ?? [origin];
   const destinations = lookupMap[destination] ?? [destination];
@@ -14,6 +29,7 @@ export function planRequests(origin, destination, limit = MAX_FANOUT_REQUESTS) {
 
   for (const from of origins) {
     for (const to of destinations) {
+      if (from === to) continue;
       direct.push({ origin: from, candidate: to, kind: 'direct' });
       for (const candidate of cacheIndex.get(`${from}:${to}`) ?? []) {
         if (candidate !== from && !destinations.includes(candidate)) {
@@ -33,17 +49,42 @@ export function planRequests(origin, destination, limit = MAX_FANOUT_REQUESTS) {
     }
   }
 
+  const directRequests = interleaveOrigins(unique.filter((request) => request.kind === 'direct'));
+  const hiddenCandidates = unique.filter((request) => request.kind === 'hidden-city');
+  const directCount = hiddenCandidates.length ? Math.ceil(limit / 2) : limit;
+  const requests = directRequests.slice(0, directCount);
+  const selectedDirectCount = requests.length;
+  const coveredOrigins = new Set(requests.map((request) => request.origin));
+  const hiddenRequests = interleaveOrigins(
+    hiddenCandidates.sort(
+      (left, right) =>
+        Number(coveredOrigins.has(left.origin)) - Number(coveredOrigins.has(right.origin)),
+    ),
+  );
+  requests.push(...hiddenRequests.slice(0, limit - requests.length));
+  requests.push(
+    ...directRequests.slice(
+      selectedDirectCount,
+      selectedDirectCount + Math.max(0, limit - requests.length),
+    ),
+  );
   return {
-    requests: unique.slice(0, limit),
+    requests: requests.slice(0, limit),
     totalCandidates: unique.length,
     truncated: unique.length > limit,
   };
 }
 
-export async function fetchData(requests, departureDate, numAdults) {
+export async function fetchData(requests, departureDate, numAdults, options) {
   const settled = await Promise.allSettled(
     requests.map((request) =>
-      duffelClient.oneWayLookup(request.origin, request.candidate, departureDate, numAdults),
+      duffelClient.oneWayLookup(
+        request.origin,
+        request.candidate,
+        departureDate,
+        numAdults,
+        options,
+      ),
     ),
   );
   const fulfilled = [];
@@ -64,9 +105,9 @@ export async function fetchData(requests, departureDate, numAdults) {
   return { fulfilled, errors };
 }
 
-export async function searchOneWay(origin, destination, date, numAdults) {
+export async function searchOneWay(origin, destination, date, numAdults, options) {
   const plan = planRequests(origin, destination);
-  const { fulfilled, errors } = await fetchData(plan.requests, date, numAdults);
+  const { fulfilled, errors } = await fetchData(plan.requests, date, numAdults, options);
   const offers = fulfilled.flatMap((result) => filterJSONResult(result.offers, destination));
   const normalized = offers.map((offer) => OneWayFilterItems(offer, 0));
   normalized.sort((left, right) =>
@@ -87,10 +128,6 @@ export async function searchOneWay(origin, destination, date, numAdults) {
   };
 }
 
-export async function findAllOneWayFlights(origin, destination, date, numAdults) {
-  return (await searchOneWay(origin, destination, date, numAdults)).itineraries;
-}
-
 export function filterData(itineraries, numAdults, destination) {
   const results = [];
   const seenFlights = new Set();
@@ -98,12 +135,14 @@ export function filterData(itineraries, numAdults, destination) {
 
   for (const itinerary of itineraries) {
     if (!Array.isArray(itinerary.segments) || itinerary.segments.length === 0) continue;
-    const flightKey = itinerary.segments
-      .map(
-        (segment) =>
-          `${segment.origin}-${segment.destination}:${segment.carrierCode}${segment.flightNumber}:${segment.departureTime}`,
-      )
-      .join('|');
+    const flightKey =
+      `${itinerary.currency}|` +
+      itinerary.segments
+        .map(
+          (segment) =>
+            `${segment.origin}-${segment.destination}:${segment.carrierCode}${segment.flightNumber}:${segment.departureTime}`,
+        )
+        .join('|');
     if (seenFlights.has(flightKey)) continue;
     seenFlights.add(flightKey);
 
@@ -112,7 +151,8 @@ export function filterData(itineraries, numAdults, destination) {
     let destinationIndex = -1;
     itinerary.segments.forEach((segment, index) => {
       if (index < itinerary.segments.length - 1) layovers.push(segment.destination);
-      if (destinationCodes.includes(segment.destination)) destinationIndex = index;
+      if (destinationIndex === -1 && destinationCodes.includes(segment.destination))
+        destinationIndex = index;
       path.push(segment.destination);
     });
     if (destinationIndex === -1) continue;
@@ -120,13 +160,14 @@ export function filterData(itineraries, numAdults, destination) {
     const finalDestination = itinerary.segments.at(-1).destination;
     const isHiddenCity = !destinationCodes.includes(finalDestination);
     results.push({
+      id: flightKey,
       airline: itinerary.segments[0].carrierName,
       path: path.join(' → '),
       price: itinerary.price,
       currency: itinerary.currency,
       duration: itinerary.totalDuration,
       isHiddenCity,
-      layoverCity: isHiddenCity ? destination : null,
+      layoverCity: isHiddenCity ? itinerary.segments[destinationIndex].destination : null,
       nonstop: itinerary.segments.length === 1,
       bookingLink: getBookingLink(
         itinerary.segments[0].origin,

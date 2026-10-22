@@ -109,3 +109,45 @@ test('valid search returns result metadata', async () => {
   assert.equal(body.outbound[0].currency, 'USD');
   assert.equal(body.meta.outbound.partial, false);
 });
+
+test('round trips retain the successful direction and identify failed directions', async () => {
+  for (const failedOrigin of ['JFK', 'DTW', 'both']) {
+    const app = createApp({
+      config,
+      database,
+      jobRunner,
+      searchFlights: async (origin, _destination, _date, _travelers, options) => {
+        assert.ok(options.signal instanceof AbortSignal);
+        if (origin === failedOrigin || failedOrigin === 'both')
+          throw new Error('Provider unavailable');
+        return searchFlights();
+      },
+    });
+    const partialServer = app.listen(0);
+    await new Promise((resolve) => partialServer.once('listening', resolve));
+    try {
+      const response = await fetch(`http://127.0.0.1:${partialServer.address().port}/api/search`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          origin: 'JFK',
+          destination: 'DTW',
+          departureDate: '2099-02-28',
+          returnDate: '2099-03-01',
+          travelers: 1,
+        }),
+      });
+      assert.equal(response.status, failedOrigin === 'both' ? 502 : 200);
+      const body = await response.json();
+      if (failedOrigin !== 'both') {
+        const failed = failedOrigin === 'JFK' ? 'outbound' : 'inbound';
+        const succeeded = failedOrigin === 'JFK' ? 'inbound' : 'outbound';
+        assert.deepEqual(body[failed], []);
+        assert.match(body.meta[failed].error, /could not be checked/);
+        assert.equal(body[succeeded].length, 1);
+      }
+    } finally {
+      await new Promise((resolve) => partialServer.close(resolve));
+    }
+  }
+});

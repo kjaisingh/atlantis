@@ -1,11 +1,90 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { filterData, filterJSONResult, getBookingLink } from './search.js';
-import { pinNonstopFirst } from './routes.js';
+import { filterData, filterJSONResult, getBookingLink, planRequests } from './search.js';
+import { pinNonstopFirst, selectResults } from './routes.js';
 
 // dest kept out of lookup-map.json's real metro groupings on purpose, so these
 // tests don't depend on the shape of live cache data.
 const DEST = 'ZZZ';
+
+test('metro searches retain hidden-city coverage and spread the request budget across origins', () => {
+  const plan = planRequests('NYC', 'WAS');
+  assert.equal(plan.requests.length, 4);
+  assert.equal(plan.requests.filter((request) => request.kind === 'hidden-city').length, 2);
+  assert.equal(new Set(plan.requests.map((request) => request.origin)).size, 3);
+  assert.ok(plan.truncated);
+  assert.ok(plan.totalCandidates > 4);
+  assert.equal(
+    new Set(plan.requests.map((request) => `${request.origin}:${request.candidate}`)).size,
+    4,
+  );
+});
+
+test('request planning uses spare capacity and never queries an airport against itself', () => {
+  assert.deepEqual(planRequests('ZZZ', 'YYY').requests, [
+    { origin: 'ZZZ', candidate: 'YYY', kind: 'direct' },
+  ]);
+  assert.equal(
+    planRequests('NYC', 'JFK').requests.some((request) => request.origin === request.candidate),
+    false,
+  );
+  for (const limit of [1, 2, 3, 4, 10, 100]) {
+    const plan = planRequests('NYC', 'DTW', limit);
+    assert.equal(plan.requests.length, Math.min(limit, plan.totalCandidates));
+  }
+});
+
+test('result limits retain every currency and each currency nonstop comparison', () => {
+  const flights = ['EUR', 'USD'].flatMap((currency) =>
+    Array.from({ length: 15 }, (_, i) => ({ currency, price: 100 + i, nonstop: i === 14 })),
+  );
+  const selected = selectResults(flights);
+  assert.equal(selected.length, 20);
+  for (const currency of ['EUR', 'USD']) {
+    const group = selected.filter((flight) => flight.currency === currency);
+    assert.equal(group.length, 10);
+    assert.equal(group[0].nonstop, true);
+    assert.equal(group[1].price, 100);
+  }
+});
+
+test('same flight keeps each currency and metro layovers identify the actual airport', () => {
+  const segments = [
+    {
+      origin: 'DTW',
+      destination: 'JFK',
+      carrierCode: 'AA',
+      flightNumber: '1',
+      departureTime: '2099-01-01T10:00:00',
+      arrivalTime: '2099-01-01T12:00:00',
+    },
+    {
+      origin: 'JFK',
+      destination: 'LHR',
+      carrierCode: 'AA',
+      flightNumber: '2',
+      departureTime: '2099-01-01T14:00:00',
+      arrivalTime: '2099-01-02T02:00:00',
+    },
+  ];
+  const results = filterData(
+    [
+      { segments, price: 100, currency: 'EUR' },
+      { segments, price: 120, currency: 'USD' },
+      { segments, price: 150, currency: 'USD' },
+    ],
+    1,
+    'NYC',
+  );
+  assert.deepEqual(
+    results.map((result) => result.currency),
+    ['EUR', 'USD'],
+  );
+  assert.equal(results[1].price, 120);
+  assert.equal(results[0].layoverCity, 'JFK');
+  assert.equal(results[0].arrivalTime, segments[0].arrivalTime);
+  assert.notEqual(results[0].id, results[1].id);
+});
 
 test('malformed Duffel offers are skipped without hiding usable offers', () => {
   const valid = {

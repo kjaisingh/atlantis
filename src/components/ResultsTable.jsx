@@ -96,7 +96,12 @@ export default function ResultsTable({ title, itineraries, meta }) {
         </div>
       </div>
 
-      {meta?.partial && (
+      {meta?.error && (
+        <p role="status" className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          {meta.error}
+        </p>
+      )}
+      {meta?.partial && !meta.error && (
         <p className="mt-3 flex items-start gap-2 rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-800">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
           Partial search: {meta.succeeded} of {meta.requested} checks completed
@@ -122,7 +127,10 @@ export default function ResultsTable({ title, itineraries, meta }) {
         <div className="mt-4 space-y-3">
           {visible.map((itinerary) => (
             <a
-              key={`${itinerary.path}|${itinerary.departureTime}|${itinerary.price}|${itinerary.currency}`}
+              key={
+                itinerary.id ||
+                `${itinerary.path}|${itinerary.departureTime}|${itinerary.price}|${itinerary.currency}`
+              }
               href={itinerary.bookingLink}
               target="_blank"
               rel="noopener noreferrer"

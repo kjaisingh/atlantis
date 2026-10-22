@@ -5,6 +5,44 @@ import { isValidFutureDate, todayUtc, validateSubscriber, validateTrip } from '.
 const now = new Date('2026-10-13T12:00:00Z');
 const airports = new Set(['JFK', 'DTW']);
 
+test('numeric fields reject booleans, arrays, objects, and empty values', () => {
+  for (const value of [true, false, null, [], [2], {}, '', ' ']) {
+    assert.ok(
+      validateTrip(
+        { origin: 'JFK', destination: 'DTW', departureDate: '2026-10-14', travelers: value },
+        airports,
+        now,
+      ).error,
+    );
+    assert.ok(
+      validateSubscriber({
+        name: 'Jane',
+        email: 'jane@example.com',
+        currency: 'USD',
+        priceThreshold: value,
+      }).error,
+    );
+  }
+});
+
+test('date fields reject non-string JSON values', () => {
+  for (const returnDate of [false, 0, ['2026-10-15'], {}]) {
+    assert.ok(
+      validateTrip(
+        {
+          origin: 'JFK',
+          destination: 'DTW',
+          departureDate: '2026-10-14',
+          travelers: 1,
+          returnDate,
+        },
+        airports,
+        now,
+      ).error,
+    );
+  }
+});
+
 test('date validation rejects rollover dates and past dates', () => {
   assert.equal(isValidFutureDate('2027-02-29', now), false);
   assert.equal(isValidFutureDate('2026-02-30', now), false);

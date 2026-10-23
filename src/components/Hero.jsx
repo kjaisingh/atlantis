@@ -2,10 +2,13 @@ import { Plane, TrendingDown } from 'lucide-react';
 
 export default function Hero() {
   return (
-    <header id="page-top" className="relative overflow-hidden pt-32 pb-20 sm:pt-40 sm:pb-28">
+    <header
+      id="page-top"
+      className="relative isolate overflow-hidden pt-24 pb-24 sm:pt-28 sm:pb-28"
+    >
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_15%_20%,theme(colors.brand.100)_0%,transparent_45%),radial-gradient(circle_at_85%_10%,theme(colors.accent.500)/12%_0%,transparent_40%)]"
+        className="pointer-events-none absolute inset-0 -z-10 bg-linear-to-br from-brand-50 via-white to-orange-50"
       />
 
       <div className="mx-auto grid max-w-6xl gap-12 px-4 sm:px-6 lg:grid-cols-2 lg:items-center lg:gap-8">
@@ -37,7 +40,7 @@ export default function Hero() {
         <div className="mx-auto w-full max-w-sm lg:mx-0">
           <div
             aria-hidden="true"
-            className="relative rounded-2xl bg-white p-6 shadow-xl shadow-slate-200/70 ring-1 ring-slate-100 [mask-image:radial-gradient(circle_10px_at_0_50%,transparent_98%,black),radial-gradient(circle_10px_at_100%_50%,transparent_98%,black)] [mask-repeat:no-repeat]"
+            className="relative rounded-2xl bg-white p-6 shadow-xl shadow-slate-200/70 ring-1 ring-slate-200"
           >
             <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
               Example
@@ -47,7 +50,12 @@ export default function Hero() {
               <span>JFK</span>
               <Plane className="h-3.5 w-3.5 shrink-0 text-brand-500" />
               <span>DTW</span>
+              <span className="text-slate-300">···</span>
+              <span className="text-slate-400">ORD</span>
             </div>
+            <p className="mt-2 text-xs text-slate-500">
+              Exit in Detroit · Ticket continues to Chicago
+            </p>
 
             <p className="mt-4 text-3xl font-extrabold text-slate-900">$188</p>
 

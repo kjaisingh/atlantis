@@ -2,11 +2,6 @@ import { useMemo, useState } from 'react';
 import { ArrowLeftRight, Calendar, Search, Users } from 'lucide-react';
 import AirportCombobox from './AirportCombobox.jsx';
 
-function localDate() {
-  const now = new Date();
-  return new Date(now.getTime() - now.getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
-}
-
 export default function SearchForm({ airports, onSearch, loading, disabled }) {
   const [tripType, setTripType] = useState('oneway');
   const [origin, setOrigin] = useState('');
@@ -15,7 +10,7 @@ export default function SearchForm({ airports, onSearch, loading, disabled }) {
   const [returnDate, setReturnDate] = useState('');
   const [travelers, setTravelers] = useState(1);
   const airportCodes = useMemo(() => new Set(airports.map((airport) => airport.code)), [airports]);
-  const today = localDate();
+  const today = new Date().toISOString().slice(0, 10);
   const validRoute =
     airportCodes.has(origin) && airportCodes.has(destination) && origin !== destination;
 
@@ -42,11 +37,18 @@ export default function SearchForm({ airports, onSearch, loading, disabled }) {
   }
 
   return (
-    <div id="search" className="scroll-mt-24 px-4 sm:px-6">
+    <div id="search" className="relative scroll-mt-24 px-4 pb-10 sm:px-6">
       <form
+        aria-label="Flight search"
         onSubmit={handleSubmit}
         className="mx-auto -mt-12 max-w-4xl rounded-3xl bg-white p-5 shadow-2xl shadow-slate-300/40 ring-1 ring-slate-200/70 sm:-mt-16 sm:p-8"
       >
+        <div className="mb-5">
+          <h2 className="text-xl font-bold text-slate-950">Find your next flight</h2>
+          <p className="mt-1 text-sm text-slate-500">
+            Compare ordinary fares with hidden-city options.
+          </p>
+        </div>
         <fieldset>
           <legend className="sr-only">Trip type</legend>
           <div className="inline-flex rounded-full bg-slate-100 p-1 text-sm font-semibold">
@@ -145,6 +147,16 @@ export default function SearchForm({ airports, onSearch, loading, disabled }) {
         >
           <Search className="h-4 w-4" /> {loading ? 'Searching…' : 'Search flights'}
         </button>
+        <p className="mt-4 text-center text-xs leading-5 text-slate-600">
+          Hidden-city tickets need carry-on only and separate tickets for each direction.{' '}
+          <a
+            href="#how-it-works"
+            className="font-semibold text-brand-700 underline underline-offset-2"
+          >
+            Read the tradeoffs
+          </a>
+          .
+        </p>
       </form>
     </div>
   );

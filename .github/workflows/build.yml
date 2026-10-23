@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -28,6 +28,6 @@ jobs:
       - run: npm run lint
       - run: npm run validate:data
       - run: npm test
-      - run: npm audit --omit=dev --audit-level=high
-      - run: npx playwright install --with-deps chromium
+      - run: npm audit --audit-level=high
+      - run: npx playwright install --only-shell chromium
       - run: npm run test:e2e

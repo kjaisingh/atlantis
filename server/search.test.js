@@ -48,6 +48,19 @@ test('result limits retain every currency and each currency nonstop comparison',
   }
 });
 
+test('a full page of cheaper ordinary fares cannot hide every hidden-city comparison', () => {
+  const ordinary = Array.from({ length: 12 }, (_, index) => ({
+    currency: 'USD',
+    price: 100 + index,
+    nonstop: true,
+  }));
+  const hidden = { currency: 'USD', price: 200, isHiddenCity: true };
+  const selected = selectResults([...ordinary, hidden]);
+  assert.equal(selected.length, 10);
+  assert.equal(selected[0], ordinary[0]);
+  assert.ok(selected.includes(hidden));
+});
+
 test('same flight keeps each currency and metro layovers identify the actual airport', () => {
   const segments = [
     {

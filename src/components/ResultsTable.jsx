@@ -111,7 +111,8 @@ export default function ResultsTable({ title, itineraries, meta }) {
       )}
       {meta?.available > meta?.returned && (
         <p className="mt-2 text-xs text-slate-500">
-          Showing up to 10 options per currency, including a nonstop comparison when available.
+          Showing up to 10 options per currency, retaining nonstop and hidden-city comparisons when
+          available.
         </p>
       )}
 

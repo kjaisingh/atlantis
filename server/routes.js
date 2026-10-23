@@ -57,12 +57,15 @@ export function pinNonstopFirst(itineraries) {
 
 export function selectResults(itineraries) {
   const currencies = new Set(itineraries.map((itinerary) => itinerary.currency));
-  return [...currencies].flatMap((currency) =>
-    pinNonstopFirst(itineraries.filter((itinerary) => itinerary.currency === currency)).slice(
-      0,
-      10,
-    ),
-  );
+  return [...currencies].flatMap((currency) => {
+    const group = pinNonstopFirst(
+      itineraries.filter((itinerary) => itinerary.currency === currency),
+    );
+    const selected = group.slice(0, 10);
+    const hiddenCity = group.find((itinerary) => itinerary.isHiddenCity);
+    if (hiddenCity && !selected.includes(hiddenCity)) selected[selected.length - 1] = hiddenCity;
+    return selected;
+  });
 }
 
 function secretMatches(actual, expected) {

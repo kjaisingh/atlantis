@@ -20,7 +20,7 @@ const steps = [
 
 export default function HowItWorks() {
   return (
-    <section id="how-it-works" className="bg-slate-50 py-20">
+    <section id="how-it-works" className="scroll-mt-16 bg-slate-50 py-16">
       <div className="mx-auto max-w-5xl px-4 sm:px-6">
         <div className="mx-auto max-w-xl text-center">
           <h2 className="text-3xl font-bold text-slate-900">How hidden-city fares work</h2>

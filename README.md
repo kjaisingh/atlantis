@@ -8,14 +8,14 @@ Hidden-city travel carries risks: checked bags may continue to the ticketed dest
 
 - Search one-way or round-trip flights by airport or metro area and traveler count.
 - Compare nonstop and hidden-city routes; filter or sort by price, route, and departure time.
-- Keep currencies separate and label partial results when provider requests fail or search coverage is limited.
+- Keep currencies separate, show airport-local times, and retain successful results when one round-trip direction fails.
 - Open a matching Kayak search to check the current itinerary and price.
 - Optionally receive email price alerts when Supabase and SMTP delivery are configured.
 
 ## Architecture
 
 - React and Vite provide the client; Express serves the API and built app on Render.
-- The API validates requests, plans a bounded set of routes from airport and candidate data, and queries Duffel.
+- The API queries ordinary Duffel offers for the requested route and extra endpoints from a static candidate table, then keeps itineraries passing through the intended destination. Searches cover up to four route combinations per direction within a 55-second deadline, with limited coverage labeled.
 - Search results are normalized, deduplicated, and grouped by currency.
 - Optional Supabase Postgres stores price subscriptions; SMTP sends matching alerts from a scheduled job.
 
@@ -39,7 +39,7 @@ Hidden-city travel carries risks: checked bags may continue to the ticketed dest
    npm run dev
    ```
 
-4. To enable price alerts, create a Supabase project and run [`supabase/schema.sql`](supabase/schema.sql) in its SQL Editor. Set the Supabase and SMTP values, `SUBSCRIPTIONS_ENABLED=true`, and `JOB_SECRET`. Add `ATLANTIS_URL` and `JOB_SECRET` as GitHub Actions secrets for scheduled delivery.
+4. To enable price alerts, create a Supabase project and run [`supabase/schema.sql`](supabase/schema.sql) in its SQL Editor. Older databases need the [currency migration](supabase/migrations/20261013_add_subscription_currency.sql) after confirming existing alerts use USD. Set the Supabase and SMTP values, `SUBSCRIPTIONS_ENABLED=true`, and `JOB_SECRET`. Add `ATLANTIS_URL` and `JOB_SECRET` as GitHub Actions secrets for scheduled delivery.
 5. Deploy with the [Render Blueprint](render.yaml), setting `DUFFEL_API_KEY` and any optional alert values there.
 
 ## Feature backlog

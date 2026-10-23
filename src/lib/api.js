@@ -1,10 +1,11 @@
 async function request(path, options = {}) {
   let response;
+  const timeout = AbortSignal.timeout(65_000);
   try {
     response = await fetch(`/api${path}`, {
       headers: { 'Content-Type': 'application/json' },
-      signal: AbortSignal.timeout(65_000),
       ...options,
+      signal: options.signal ? AbortSignal.any([options.signal, timeout]) : timeout,
     });
   } catch (error) {
     if (error.name === 'TimeoutError') {
@@ -16,7 +17,14 @@ async function request(path, options = {}) {
   }
 
   const contentType = response.headers.get('content-type') || '';
-  const body = contentType.includes('application/json') ? await response.json() : null;
+  let body = null;
+  try {
+    if (contentType.includes('application/json')) body = await response.json();
+  } catch (error) {
+    throw new Error('Atlantis returned an incomplete response. Please try again.', {
+      cause: error,
+    });
+  }
   if (!response.ok) {
     throw new Error(body?.error || `Request failed (${response.status}).`);
   }
@@ -24,12 +32,12 @@ async function request(path, options = {}) {
   return body;
 }
 
-export function getHealth() {
-  return request('/health');
+export function getHealth(options) {
+  return request('/health', options);
 }
 
-export function getAirports() {
-  return request('/airports');
+export function getAirports(options) {
+  return request('/airports', options);
 }
 
 export function searchFlights(params) {

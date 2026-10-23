@@ -114,7 +114,10 @@ async function mockApi(page, subscriptions = true) {
 }
 
 async function runDesktop() {
-  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const context = await browser.newContext({
+    viewport: { width: 1440, height: 900 },
+    timezoneId: 'Pacific/Auckland',
+  });
   const page = await context.newPage();
   let expectSearchFailure = false;
   monitor(
@@ -124,6 +127,11 @@ async function runDesktop() {
   );
   await mockApi(page);
   await page.goto(baseUrl, { waitUntil: 'networkidle' });
+  const searchBox = await page.getByRole('form', { name: 'Flight search' }).boundingBox();
+  const explainer = await page
+    .getByRole('heading', { name: 'How hidden-city fares work' })
+    .boundingBox();
+  if (searchBox.y >= explainer.y) throw new Error('Search is buried below the explainer.');
   await page.screenshot({ path: `${outDir}/landing-desktop.png`, fullPage: true });
 
   if (live) {
@@ -150,13 +158,23 @@ async function runDesktop() {
     return;
   }
 
-  await page.getByRole('combobox', { name: 'Origin' }).fill('JFK');
-  await page.getByRole('option', { name: /JFK/ }).click();
+  const originInput = page.getByRole('combobox', { name: 'Origin' });
+  await originInput.fill('NoSuchAirport');
+  await page.getByText('No matching airport found.').waitFor();
+  await originInput.press('Escape');
+  if (await page.getByText('No matching airport found.').count())
+    throw new Error('Escape did not close empty airport suggestions.');
+  await originInput.fill('JFK');
+  await originInput.press('Escape');
+  await originInput.press('ArrowDown');
+  await originInput.press('Enter');
   await page.getByRole('combobox', { name: 'Destination' }).fill('DTW');
   await page.getByRole('option', { name: /DTW/ }).click();
   await page.locator('#departureDate').fill('2099-02-28');
   await page.getByRole('button', { name: 'Search flights' }).click();
   await page.getByText('$188.00').waitFor();
+  await page.getByText('Feb 28, 8:00 AM → Feb 28, 10:00 AM').waitFor();
+  await page.getByText('Feb 28, 2099 · 1 traveler · Economy').waitFor();
   await page.locator('a').filter({ hasText: 'Hidden-city' }).waitFor();
   await page.getByRole('combobox', { name: 'Sort' }).selectOption('departure');
   const direct = page.locator('a[href="https://example.com/direct"]');
@@ -181,6 +199,9 @@ async function runDesktop() {
       throw new Error('Stale search results remained after a failed retry.');
     }
     expectSearchFailure = false;
+    await mockApi(page);
+    await page.getByRole('button', { name: 'Retry search', exact: true }).click();
+    await page.getByText('$188.00').waitFor();
   }
   await context.close();
 }
@@ -193,7 +214,88 @@ async function runMobile() {
   await page.goto(baseUrl, { waitUntil: 'networkidle' });
   await page.getByRole('button', { name: 'Open menu' }).click();
   await page.getByRole('link', { name: 'How it works' }).waitFor();
+  await page.getByRole('link', { name: 'How it works' }).focus();
+  await page.keyboard.press('Escape');
+  if (
+    !(await page
+      .getByRole('button', { name: 'Open menu' })
+      .evaluate((element) => element === element.ownerDocument.activeElement))
+  )
+    throw new Error('Menu Escape did not restore focus.');
+  await page.getByRole('button', { name: 'Open menu' }).click();
   await page.screenshot({ path: `${outDir}/menu-mobile.png`, fullPage: true });
+  await context.close();
+}
+
+async function runRecoveryStates() {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const page = await context.newPage();
+  monitor(page, 'recovery', (message) => message.text().includes('503 (Service Unavailable)'));
+  await mockApi(page);
+  let connected = false;
+  await page.route('**/api/health', (route) =>
+    route.fulfill(
+      connected
+        ? { json: { capabilities: { search: true, subscriptions: false } } }
+        : { status: 503, json: { error: 'Unavailable' } },
+    ),
+  );
+  await page.goto(baseUrl, { waitUntil: 'networkidle' });
+  await page.getByRole('button', { name: 'Retry connection' }).waitFor();
+  connected = true;
+  await page.getByRole('button', { name: 'Retry connection' }).click();
+  await page.getByRole('combobox', { name: 'Origin' }).fill('JFK');
+  await page.getByRole('option', { name: /JFK/ }).click();
+  await page.getByRole('combobox', { name: 'Destination' }).fill('DTW');
+  await page.getByRole('option', { name: /DTW/ }).click();
+  await page.locator('#departureDate').fill('2099-02-28');
+  let result = { outbound: [], meta: { outbound: { requested: 1, succeeded: 1 } } };
+  await page.route('**/api/search', (route) => route.fulfill({ json: result }));
+  await page.getByRole('button', { name: 'Search flights' }).click();
+  await page.getByText('No fares found for this date and route.', { exact: false }).waitFor();
+  result = {
+    outbound: [
+      {
+        id: 'direct-eur',
+        airline: 'Example Air',
+        path: 'JFK → DTW',
+        currency: 'EUR',
+        price: '100',
+        nonstop: true,
+        isHiddenCity: false,
+        departureTime: '2099-02-28T08:00:00',
+        arrivalTime: '2099-02-28T10:00:00',
+        duration: 'PT2H',
+        bookingLink: 'https://example.com/direct',
+      },
+    ],
+    inbound: [],
+    meta: {
+      inbound: {
+        partial: true,
+        error: 'This direction could not be checked. Please retry your search.',
+      },
+    },
+  };
+  await page.getByRole('button', { name: 'Round-trip', exact: true }).click();
+  await page.locator('#returnDate').fill('2099-03-01');
+  await page.getByRole('button', { name: 'Search flights' }).click();
+  await page.getByText('This direction could not be checked.', { exact: false }).waitFor();
+  await page.getByText('€100.00').waitFor();
+  await page.getByText('Travel time: 2h').waitFor();
+  await page.getByRole('combobox', { name: 'Outbound itinerary type' }).selectOption('hidden');
+  await page.getByText('No itineraries match these filters.').waitFor();
+  await page.getByRole('button', { name: 'Show all routes' }).click();
+  await page.getByText('€100.00').waitFor();
+  if (await page.getByRole('heading', { name: 'Watch this route' }).count())
+    throw new Error('Partial round trip allowed a price alert.');
+  if (
+    await page
+      .locator('html')
+      .evaluate((element) => element.scrollWidth > element.ownerDocument.defaultView.innerWidth)
+  )
+    throw new Error('Mobile results overflow horizontally.');
+  await page.screenshot({ path: `${outDir}/recovery-mobile.png`, fullPage: true });
   await context.close();
 }
 
@@ -221,7 +323,10 @@ async function runDisabledAlerts() {
 try {
   await runDesktop();
   await runMobile();
-  if (!live) await runDisabledAlerts();
+  if (!live) {
+    await runDisabledAlerts();
+    await runRecoveryStates();
+  }
   if (failures.length) throw new Error(failures.join('\n'));
   console.log(`Smoke test passed. Screenshots: ${outDir}`);
 } finally {

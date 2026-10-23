@@ -6,6 +6,7 @@ import {
   SlidersHorizontal,
   TrendingDown,
 } from 'lucide-react';
+import { formatAirportTime, formatDuration } from '../lib/format.js';
 
 function formatPrice(value, currency) {
   try {
@@ -13,17 +14,6 @@ function formatPrice(value, currency) {
   } catch {
     return `${value} ${currency}`;
   }
-}
-
-function formatDateTime(value) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat('en-US', {
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  }).format(date);
 }
 
 export default function ResultsTable({ title, itineraries, meta }) {
@@ -39,7 +29,7 @@ export default function ResultsTable({ title, itineraries, meta }) {
     );
     return [...filtered].sort((left, right) =>
       sort === 'departure'
-        ? new Date(left.departureTime) - new Date(right.departureTime)
+        ? left.departureTime.localeCompare(right.departureTime)
         : Number(left.price) - Number(right.price),
     );
   }, [currency, itineraries, kind, sort]);
@@ -57,44 +47,55 @@ export default function ResultsTable({ title, itineraries, meta }) {
     cheapest && Number.isFinite(directPrice) ? directPrice - Number(cheapest.price) : 0;
 
   return (
-    <div className="mt-8 rounded-3xl border border-slate-200 bg-slate-50/70 p-4 sm:p-6">
+    <section
+      aria-label={`${title} flights`}
+      className="mt-8 rounded-3xl border border-slate-200 bg-slate-50/70 p-4 sm:p-6"
+    >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h3 className="text-lg font-bold text-slate-950">{title}</h3>
-        <div className="flex flex-wrap items-center gap-2" aria-label={`${title} filters`}>
-          <SlidersHorizontal className="h-4 w-4 text-slate-400" aria-hidden="true" />
-          {currencies.length > 1 && (
+        {itineraries.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2" aria-label={`${title} filters`}>
+            <SlidersHorizontal className="h-4 w-4 text-slate-400" aria-hidden="true" />
+            {currencies.length > 1 && (
+              <select
+                value={currency}
+                onChange={(event) => setCurrency(event.target.value)}
+                aria-label={`${title} currency`}
+                className="filter-control"
+              >
+                {currencies.map((code) => (
+                  <option key={code}>{code}</option>
+                ))}
+              </select>
+            )}
             <select
-              value={currency}
-              onChange={(event) => setCurrency(event.target.value)}
-              aria-label="Currency"
+              value={kind}
+              onChange={(event) => setKind(event.target.value)}
+              aria-label={`${title} itinerary type`}
               className="filter-control"
             >
-              {currencies.map((code) => (
-                <option key={code}>{code}</option>
-              ))}
+              <option value="all">All routes</option>
+              <option value="nonstop">Nonstop</option>
+              <option value="hidden">Hidden-city</option>
             </select>
-          )}
-          <select
-            value={kind}
-            onChange={(event) => setKind(event.target.value)}
-            aria-label="Itinerary type"
-            className="filter-control"
-          >
-            <option value="all">All routes</option>
-            <option value="nonstop">Nonstop</option>
-            <option value="hidden">Hidden-city</option>
-          </select>
-          <select
-            value={sort}
-            onChange={(event) => setSort(event.target.value)}
-            aria-label="Sort results"
-            className="filter-control"
-          >
-            <option value="price">Lowest price</option>
-            <option value="departure">Earliest departure</option>
-          </select>
-        </div>
+            <select
+              value={sort}
+              onChange={(event) => setSort(event.target.value)}
+              aria-label={`Sort ${title.toLowerCase()} results`}
+              className="filter-control"
+            >
+              <option value="price">Lowest price</option>
+              <option value="departure">Earliest departure</option>
+            </select>
+          </div>
+        )}
       </div>
+      {itineraries.length > 0 && (
+        <p className="mt-2 text-xs text-slate-500" role="status">
+          {visible.length} {visible.length === 1 ? 'option' : 'options'} · {currency} · Times local
+          to each airport
+        </p>
+      )}
 
       {meta?.error && (
         <p role="status" className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-800">
@@ -104,11 +105,13 @@ export default function ResultsTable({ title, itineraries, meta }) {
       {meta?.partial && !meta.error && (
         <p className="mt-3 flex items-start gap-2 rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-800">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-          Partial search: {meta.succeeded} of {meta.requested} checks completed
-          {meta.truncated
-            ? `; request budget covered ${meta.requested} of ${meta.totalCandidates} candidates`
-            : ''}
-          .
+          Limited coverage: {meta.succeeded} of {meta.requested} route checks completed
+          {meta.truncated ? `; ${meta.totalCandidates} route combinations are known` : ''}.
+        </p>
+      )}
+      {meta?.available > meta?.returned && (
+        <p className="mt-2 text-xs text-slate-500">
+          Showing up to 10 options per currency, including a nonstop comparison when available.
         </p>
       )}
 
@@ -120,9 +123,24 @@ export default function ResultsTable({ title, itineraries, meta }) {
       )}
 
       {visible.length === 0 ? (
-        <p className="py-10 text-center text-sm text-slate-500">
-          No itineraries match these filters.
-        </p>
+        !meta?.error && (
+          <div className="py-10 text-center text-sm text-slate-600">
+            <p>
+              {itineraries.length === 0
+                ? 'No fares found for this date and route. Try another date or a nearby airport.'
+                : 'No itineraries match these filters.'}
+            </p>
+            {itineraries.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setKind('all')}
+                className="mt-3 font-semibold text-brand-700 underline underline-offset-4"
+              >
+                Show all routes
+              </button>
+            )}
+          </div>
+        )
       ) : (
         <div className="mt-4 space-y-3">
           {visible.map((itinerary) => (
@@ -153,16 +171,27 @@ export default function ResultsTable({ title, itineraries, meta }) {
                       <Badge className="bg-amber-50 text-amber-800">Hidden-city</Badge>
                     )}
                   </div>
-                  <p className="mt-1.5 truncate font-mono text-sm text-slate-600">
+                  <p className="mt-1.5 break-words font-mono text-sm text-slate-600">
                     {itinerary.path}
                   </p>
                   <p className="mt-1 text-xs text-slate-500">
-                    {formatDateTime(itinerary.departureTime)} →{' '}
-                    {formatDateTime(itinerary.arrivalTime)}
+                    {formatAirportTime(itinerary.departureTime)} →{' '}
+                    {formatAirportTime(itinerary.arrivalTime)}
                   </p>
+                  {formatDuration(itinerary.duration) && (
+                    <p className="mt-1 text-xs text-slate-500">
+                      {itinerary.isHiddenCity ? 'Full ticket duration' : 'Travel time'}:{' '}
+                      {formatDuration(itinerary.duration)}
+                    </p>
+                  )}
+                  {!itinerary.nonstop && !itinerary.isHiddenCity && (
+                    <Badge className="mt-2 inline-block bg-slate-100 text-slate-600">
+                      Connecting flight
+                    </Badge>
+                  )}
                   {itinerary.isHiddenCity && (
                     <p className="mt-2 text-xs font-medium text-amber-800">
-                      Exit at {itinerary.layoverCity}; do not board the final segment.
+                      Exit at {itinerary.layoverCity}; skip the remaining flights.
                     </p>
                   )}
                 </div>
@@ -179,7 +208,7 @@ export default function ResultsTable({ title, itineraries, meta }) {
           ))}
         </div>
       )}
-    </div>
+    </section>
   );
 }
 

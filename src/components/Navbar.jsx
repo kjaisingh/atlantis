@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Menu, Plane, X } from 'lucide-react';
 
 const links = [
@@ -8,14 +8,18 @@ const links = [
 
 export default function Navbar() {
   const [open, setOpen] = useState(false);
+  const toggleRef = useRef(null);
 
   useEffect(() => {
     function closeOnEscape(event) {
-      if (event.key === 'Escape') setOpen(false);
+      if (event.key === 'Escape' && open) {
+        setOpen(false);
+        toggleRef.current?.focus();
+      }
     }
     document.addEventListener('keydown', closeOnEscape);
     return () => document.removeEventListener('keydown', closeOnEscape);
-  }, []);
+  }, [open]);
 
   return (
     <nav className="fixed top-0 z-50 w-full border-b border-slate-100 bg-white/80 backdrop-blur-md">
@@ -40,18 +44,23 @@ export default function Navbar() {
         </div>
 
         <button
+          ref={toggleRef}
           type="button"
           onClick={() => setOpen((v) => !v)}
           className="rounded-lg p-2 text-slate-700 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 sm:hidden"
           aria-label={open ? 'Close menu' : 'Open menu'}
           aria-expanded={open}
+          aria-controls={open ? 'mobile-navigation' : undefined}
         >
           {open ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
         </button>
       </div>
 
       {open && (
-        <div className="border-t border-slate-100 bg-white px-4 pb-4 sm:hidden">
+        <div
+          id="mobile-navigation"
+          className="border-t border-slate-100 bg-white px-4 pb-4 sm:hidden"
+        >
           <div className="flex flex-col gap-3 pt-3">
             {links.map((link) => (
               <a

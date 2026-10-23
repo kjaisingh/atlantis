@@ -8,6 +8,7 @@ function isEmail(value) {
 }
 
 function calendarDate(value) {
+  if (typeof value !== 'string') return null;
   const match = DATE_PATTERN.exec(value ?? '');
   if (!match) return null;
   const [, year, month, day] = match.map(Number);
@@ -20,6 +21,12 @@ function calendarDate(value) {
     return null;
   }
   return date;
+}
+
+function numericInput(value) {
+  return typeof value === 'number' || (typeof value === 'string' && value.trim() !== '')
+    ? Number(value)
+    : Number.NaN;
 }
 
 export function todayUtc(now = new Date()) {
@@ -36,8 +43,8 @@ export function validateTrip(body, airportSet, now = new Date()) {
   const destination =
     typeof body.destination === 'string' ? body.destination.trim().toUpperCase() : '';
   const departureDate = body.departureDate;
-  const returnDate = body.returnDate || '';
-  const travelers = Number(body.travelers);
+  const returnDate = body.returnDate ?? '';
+  const travelers = numericInput(body.travelers);
 
   if (!airportSet.has(origin) || !airportSet.has(destination)) {
     return { error: 'Unknown origin or destination airport code.' };
@@ -48,7 +55,7 @@ export function validateTrip(body, airportSet, now = new Date()) {
   if (!isValidFutureDate(departureDate, now)) {
     return { error: 'Departure date must be a real, non-past calendar date.' };
   }
-  if (returnDate && !isValidFutureDate(returnDate, now)) {
+  if (returnDate !== '' && !isValidFutureDate(returnDate, now)) {
     return { error: 'Return date must be a real, non-past calendar date.' };
   }
   if (returnDate && calendarDate(returnDate) < calendarDate(departureDate)) {
@@ -64,7 +71,7 @@ export function validateTrip(body, airportSet, now = new Date()) {
 export function validateSubscriber(body) {
   const name = typeof body.name === 'string' ? body.name.trim() : '';
   const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
-  const priceThreshold = Number(body.priceThreshold);
+  const priceThreshold = numericInput(body.priceThreshold);
   const currency = typeof body.currency === 'string' ? body.currency.trim().toUpperCase() : '';
 
   if (!name || name.length > 120 || !isEmail(email)) {

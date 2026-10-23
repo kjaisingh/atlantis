@@ -4,6 +4,7 @@ const MAX_RETRIES = 3;
 const MAX_CONCURRENT_REQUESTS = 3;
 const REQUEST_TIMEOUT_MS = 25_000;
 const MAX_RESPONSE_BYTES = 2_000_000;
+export const SEARCH_TIMEOUT_MS = 55_000;
 
 let activeRequests = 0;
 const waiters = [];
@@ -29,12 +30,24 @@ function buildRequest(slices, passengers) {
   };
 }
 
-function acquireSlot() {
+function acquireSlot(signal) {
+  signal.throwIfAborted();
   if (activeRequests < MAX_CONCURRENT_REQUESTS) {
     activeRequests += 1;
     return Promise.resolve();
   }
-  return new Promise((resolve) => waiters.push(resolve));
+  return new Promise((resolve, reject) => {
+    const waiter = () => {
+      signal.removeEventListener('abort', onAbort);
+      resolve();
+    };
+    const onAbort = () => {
+      waiters.splice(waiters.indexOf(waiter), 1);
+      reject(signal.reason);
+    };
+    signal.addEventListener('abort', onAbort, { once: true });
+    waiters.push(waiter);
+  });
 }
 
 function releaseSlot() {
@@ -55,23 +68,21 @@ function updateRateState(headers) {
   if (Number.isFinite(resetAt)) rateState.resetAt = resetAt;
 }
 
-function sleep(milliseconds) {
-  return new Promise((resolve) => setTimeout(resolve, milliseconds));
-}
-
-async function reserveRateBudget() {
+async function reserveRateBudget(signal) {
   let release;
   const previous = budgetTail;
-  budgetTail = new Promise((resolve) => {
+  const reservation = new Promise((resolve) => {
     release = resolve;
   });
-  await previous;
+  budgetTail = previous.then(() => reservation);
   try {
+    await waitForBudget(previous, signal);
+    signal.throwIfAborted();
     if (rateState.remaining !== null && rateState.remaining <= 0 && rateState.resetAt) {
       const wait = Math.max(rateState.resetAt - Date.now(), 0) + 250;
       if (wait > 0) {
         console.warn(`[duffel] rate budget exhausted; waiting ${wait}ms.`);
-        await sleep(wait);
+        await sleep(wait, undefined, { signal });
       }
       rateState.remaining = rateState.limit;
     }
@@ -81,17 +92,34 @@ async function reserveRateBudget() {
   }
 }
 
+function waitForBudget(previous, signal) {
+  signal.throwIfAborted();
+  return new Promise((resolve, reject) => {
+    const onAbort = () => reject(signal.reason);
+    signal.addEventListener('abort', onAbort, { once: true });
+    previous.then(() => {
+      signal.removeEventListener('abort', onAbort);
+      resolve();
+    });
+  });
+}
+
 async function parseResponse(response) {
   const contentLength = Number(response.headers.get('content-length'));
   if (Number.isFinite(contentLength) && contentLength > MAX_RESPONSE_BYTES) {
+    await response.body?.cancel();
     throw new DuffelError('Duffel response exceeded the allowed size.');
   }
-  const text = await response.text();
-  if (text.length > MAX_RESPONSE_BYTES) {
-    throw new DuffelError('Duffel response exceeded the allowed size.');
+  const chunks = [];
+  let size = 0;
+  for await (const chunk of response.body ?? []) {
+    size += chunk.byteLength;
+    if (size > MAX_RESPONSE_BYTES)
+      throw new DuffelError('Duffel response exceeded the allowed size.');
+    chunks.push(chunk);
   }
   try {
-    return JSON.parse(text);
+    return JSON.parse(Buffer.concat(chunks).toString('utf8'));
   } catch {
     throw new DuffelError('Duffel returned an invalid response.', {
       status: response.status,
@@ -100,13 +128,14 @@ async function parseResponse(response) {
   }
 }
 
-async function postOffers(slices, passengers) {
+async function postOffers(slices, passengers, signal) {
   const apiKey = process.env.DUFFEL_API_KEY;
   if (!apiKey) throw new DuffelError('DUFFEL_API_KEY is not configured.');
 
-  await reserveRateBudget();
-  await acquireSlot();
+  await acquireSlot(signal);
   try {
+    await reserveRateBudget(signal);
+    signal.throwIfAborted();
     const response = await fetch(DUFFEL_API_URL, {
       method: 'POST',
       headers: {
@@ -115,7 +144,7 @@ async function postOffers(slices, passengers) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(buildRequest(slices, passengers)),
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      signal: AbortSignal.any([signal, AbortSignal.timeout(REQUEST_TIMEOUT_MS)]),
     });
     updateRateState(response.headers);
     const body = await parseResponse(response);
@@ -142,23 +171,30 @@ async function postOffers(slices, passengers) {
   }
 }
 
-async function requestOffers(slices, passengers) {
+async function requestOffers(slices, passengers, { signal: callerSignal } = {}) {
+  const deadline = AbortSignal.timeout(SEARCH_TIMEOUT_MS);
+  const signal = callerSignal ? AbortSignal.any([callerSignal, deadline]) : deadline;
   let lastError;
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt += 1) {
     try {
-      return await postOffers(slices, passengers);
+      return await postOffers(slices, passengers, signal);
     } catch (error) {
       lastError = error;
-      if (!error.retryable || attempt === MAX_RETRIES) break;
+      if (signal.aborted || !error.retryable || attempt === MAX_RETRIES) break;
       const resetDelay = rateState.resetAt ? Math.max(rateState.resetAt - Date.now(), 0) : 0;
       const backoff = Math.max(resetDelay, 500 * 2 ** attempt) + Math.random() * 250;
       console.warn(`[duffel] transient failure; retrying in ${Math.round(backoff)}ms.`);
-      await sleep(backoff);
+      await sleep(backoff, undefined, { signal });
     }
   }
   throw lastError;
 }
 
-export function oneWayLookup(origin, destination, departureDate, passengers) {
-  return requestOffers([{ origin, destination, departure_date: departureDate }], passengers);
+export function oneWayLookup(origin, destination, departureDate, passengers, options) {
+  return requestOffers(
+    [{ origin, destination, departure_date: departureDate }],
+    passengers,
+    options,
+  );
 }
+import { setTimeout as sleep } from 'node:timers/promises';

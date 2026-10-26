@@ -105,7 +105,7 @@ export default function ResultsTable({ title, itineraries, meta }) {
       {meta?.partial && !meta.error && (
         <p className="mt-3 flex items-start gap-2 rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-800">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-          Limited coverage: {meta.succeeded} of {meta.requested} route checks completed . Only a
+          Limited coverage: {meta.succeeded} of {meta.requested} route checks completed. Only a
           small set of possible endpoints is checked.
         </p>
       )}

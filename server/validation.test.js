@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { isValidFutureDate, todayUtc, validateSubscriber, validateTrip } from './validation.js';
+import { isValidFutureDate, todayUtc, validateTrip } from './validation.js';
 
 const now = new Date('2026-10-13T12:00:00Z');
 const airports = new Set(['JFK', 'DTW']);
@@ -13,14 +13,6 @@ test('numeric fields reject booleans, arrays, objects, and empty values', () => 
         airports,
         now,
       ).error,
-    );
-    assert.ok(
-      validateSubscriber({
-        name: 'Jane',
-        email: 'jane@example.com',
-        currency: 'USD',
-        priceThreshold: value,
-      }).error,
     );
   }
 });
@@ -69,23 +61,4 @@ test('trip validation normalizes airport codes and numeric travelers', () => {
     returnDate: '',
     travelers: 2,
   });
-});
-
-test('subscriber validation normalizes identity and requires ISO currency', () => {
-  const valid = validateSubscriber({
-    name: ' Jane ',
-    email: ' JANE@EXAMPLE.COM ',
-    priceThreshold: '250.50',
-    currency: 'usd',
-  });
-  assert.deepEqual(valid.value, {
-    name: 'Jane',
-    email: 'jane@example.com',
-    priceThreshold: 250.5,
-    currency: 'USD',
-  });
-  assert.match(
-    validateSubscriber({ name: 'Jane', email: 'bad', priceThreshold: 1 }).error,
-    /valid/,
-  );
 });

@@ -16,8 +16,9 @@
     "format:check": "prettier --check .",
     "lint": "eslint .",
     "validate:data": "node scripts/validate-data.mjs",
-    "test": "node --test server/*.test.js",
-    "test:e2e": "npm run build && node scripts/smoke-test.mjs"
+    "test": "node --test server/*.test.js && python3 scripts/test-routes.py",
+    "test:e2e": "npm run build && node scripts/smoke-test.mjs",
+    "test:db": "node scripts/test-database.mjs"
   },
   "repository": {
     "type": "git",
@@ -40,7 +41,6 @@
     "express-rate-limit": "^8.7.1",
     "helmet": "^8.3.0",
     "lucide-react": "^1.59.0",
-    "nodemailer": "^10.1.2",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"
   },

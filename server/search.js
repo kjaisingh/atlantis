@@ -1,236 +1,112 @@
-import { readFileSync } from 'node:fs';
-import * as duffelClient from './duffel.js';
+import { createHash, randomUUID } from 'node:crypto';
+import { setTimeout as sleep } from 'node:timers/promises';
+import { getStore } from './db.js';
+import { candidateEndpoints } from './route-graph.js';
+import { normalizeOffers, oneWayLookup, SEARCH_TIMEOUT_MS } from './serpapi.js';
+import { SearchError } from './errors.js';
 
-const cacheTable = JSON.parse(readFileSync(new URL('./data/cache-table.json', import.meta.url)));
-const lookupMap = JSON.parse(readFileSync(new URL('./data/lookup-map.json', import.meta.url)));
-const cacheIndex = new Map(cacheTable.map((entry) => [`${entry.X}:${entry.Y}`, entry.Z]));
-export const MAX_FANOUT_REQUESTS = 4;
-
-function interleaveOrigins(requests) {
-  const groups = new Map();
-  for (const request of requests) {
-    if (!groups.has(request.origin)) groups.set(request.origin, []);
-    groups.get(request.origin).push(request);
-  }
-  const ordered = [];
-  for (let index = 0; ordered.length < requests.length; index += 1) {
-    for (const group of groups.values()) {
-      if (group[index]) ordered.push(group[index]);
+export function createSearch({ store, lookup = oneWayLookup, now = () => Date.now() }) {
+  return async function search(origin, destination, date, travelers, options = {}) {
+    const signal = options.signal
+      ? AbortSignal.any([options.signal, AbortSignal.timeout(SEARCH_TIMEOUT_MS)])
+      : AbortSignal.timeout(SEARCH_TIMEOUT_MS);
+    let route = await store.getCandidates(origin, destination);
+    if (!route || Date.parse(route.expires_at) <= now()) {
+      const graph = await store.getGraph();
+      route = await store.cacheCandidates(
+        origin,
+        destination,
+        candidateEndpoints(origin, destination, graph),
+        graph.period,
+      );
     }
-  }
-  return ordered;
-}
-
-export function planRequests(origin, destination, limit = MAX_FANOUT_REQUESTS) {
-  const origins = lookupMap[origin] ?? [origin];
-  const destinations = lookupMap[destination] ?? [destination];
-  const direct = [];
-  const hidden = [];
-
-  for (const from of origins) {
-    for (const to of destinations) {
-      if (from === to) continue;
-      direct.push({ origin: from, candidate: to, kind: 'direct' });
-      for (const candidate of cacheIndex.get(`${from}:${to}`) ?? []) {
-        if (candidate !== from && !destinations.includes(candidate)) {
-          hidden.push({ origin: from, candidate, kind: 'hidden-city' });
-        }
+    const endpoints = [destination, ...route.candidates];
+    const key = createHash('sha256')
+      .update(
+        JSON.stringify([
+          'serpapi-v1',
+          origin,
+          destination,
+          date,
+          travelers,
+          'USD',
+          route.created_at,
+          endpoints,
+        ]),
+      )
+      .digest('hex');
+    const owner = randomUUID();
+    signal.throwIfAborted();
+    const claim = await store.claim(key, owner, endpoints.length);
+    const cached = (result) => ({ ...result, meta: { ...result.meta, fareCached: true } });
+    if (claim.status === 'ready') return cached(claim.result);
+    if (claim.status === 'limited')
+      throw new SearchError(
+        claim.code === 'daily_limit'
+          ? 'The shared daily search limit has been reached. Cached searches still work.'
+          : 'The free monthly search allowance has been used. Cached searches still work.',
+        { status: 429, code: claim.code, resetAt: claim.resetAt },
+      );
+    if (claim.status === 'failed')
+      throw new SearchError('This search recently failed. Please wait a minute before retrying.');
+    if (claim.status === 'pending') {
+      while (!signal.aborted) {
+        await sleep(400, undefined, { signal });
+        const fare = await store.getFare(key);
+        if (fare?.state === 'ready' && Date.parse(fare.expires_at) > now())
+          return cached(fare.result);
+        if (!fare || fare.state === 'failed' || Date.parse(fare.expires_at) <= now()) break;
       }
+      throw new SearchError('This search could not finish. Please retry shortly.');
     }
-  }
-
-  const unique = [];
-  const seen = new Set();
-  for (const request of [...direct, ...hidden]) {
-    const key = `${request.origin}:${request.candidate}`;
-    if (!seen.has(key)) {
-      seen.add(key);
-      unique.push(request);
+    if (claim.status !== 'owner')
+      throw new SearchError('Search storage returned an invalid reservation.', { status: 503 });
+    try {
+      const settled = await Promise.allSettled(
+        endpoints.map(async (endpoint) => {
+          signal.throwIfAborted();
+          const data = await lookup(origin, endpoint, date, travelers, { signal });
+          return normalizeOffers(data, { origin, destination, endpoint, date, travelers });
+        }),
+      );
+      const succeeded = settled.filter((x) => x.status === 'fulfilled');
+      if (!succeeded.length) throw settled[0].reason;
+      const seen = new Set();
+      const itineraries = succeeded
+        .flatMap((x) => x.value)
+        .sort((a, b) => a.price - b.price)
+        .filter((item) => {
+          if (seen.has(item.id)) return false;
+          seen.add(item.id);
+          return true;
+        });
+      const result = {
+        itineraries,
+        meta: {
+          requested: endpoints.length,
+          succeeded: succeeded.length,
+          failed: endpoints.length - succeeded.length,
+          partial: true,
+          truncated: true,
+          fareCached: false,
+          pricedAt: new Date(now()).toISOString(),
+          candidates: route.candidates,
+          candidatesExpiresAt: route.expires_at,
+          sourcePeriod: route.source_period,
+        },
+      };
+      await store.observe(origin, destination, route.created_at, [
+        ...new Set(itineraries.filter((f) => f.isHiddenCity).map((f) => f.finalDestination)),
+      ]);
+      await store.finish(key, owner, result);
+      return result;
+    } catch (error) {
+      await store.finish(key, owner, null, true).catch(() => {});
+      throw error;
     }
-  }
-
-  const directRequests = interleaveOrigins(unique.filter((request) => request.kind === 'direct'));
-  const hiddenCandidates = unique.filter((request) => request.kind === 'hidden-city');
-  const directCount = hiddenCandidates.length ? Math.ceil(limit / 2) : limit;
-  const requests = directRequests.slice(0, directCount);
-  const selectedDirectCount = requests.length;
-  const coveredOrigins = new Set(requests.map((request) => request.origin));
-  const hiddenRequests = interleaveOrigins(
-    hiddenCandidates.sort(
-      (left, right) =>
-        Number(coveredOrigins.has(left.origin)) - Number(coveredOrigins.has(right.origin)),
-    ),
-  );
-  requests.push(...hiddenRequests.slice(0, limit - requests.length));
-  requests.push(
-    ...directRequests.slice(
-      selectedDirectCount,
-      selectedDirectCount + Math.max(0, limit - requests.length),
-    ),
-  );
-  return {
-    requests: requests.slice(0, limit),
-    totalCandidates: unique.length,
-    truncated: unique.length > limit,
   };
 }
 
-export async function fetchData(requests, departureDate, numAdults, options) {
-  const settled = await Promise.allSettled(
-    requests.map((request) =>
-      duffelClient.oneWayLookup(
-        request.origin,
-        request.candidate,
-        departureDate,
-        numAdults,
-        options,
-      ),
-    ),
-  );
-  const fulfilled = [];
-  const errors = [];
-  settled.forEach((result, index) => {
-    if (result.status === 'fulfilled') fulfilled.push(result.value);
-    else {
-      errors.push({ request: requests[index], message: result.reason?.message ?? 'Unknown error' });
-      console.error('[search] fan-out request failed:', result.reason?.message ?? result.reason);
-    }
-  });
-  if (requests.length > 0 && fulfilled.length === 0) {
-    throw new AggregateError(
-      settled.filter((result) => result.status === 'rejected').map((result) => result.reason),
-      'Every Duffel fan-out request failed.',
-    );
-  }
-  return { fulfilled, errors };
-}
-
-export async function searchOneWay(origin, destination, date, numAdults, options) {
-  const plan = planRequests(origin, destination);
-  const { fulfilled, errors } = await fetchData(plan.requests, date, numAdults, options);
-  const offers = fulfilled.flatMap((result) => filterJSONResult(result.offers, destination));
-  const normalized = offers.map((offer) => OneWayFilterItems(offer, 0));
-  normalized.sort((left, right) =>
-    left.currency === right.currency
-      ? Number(left.price) - Number(right.price)
-      : left.currency.localeCompare(right.currency),
-  );
-  return {
-    itineraries: filterData(normalized, numAdults, destination),
-    meta: {
-      requested: plan.requests.length,
-      succeeded: fulfilled.length,
-      failed: errors.length,
-      truncated: plan.truncated,
-      totalCandidates: plan.totalCandidates,
-      partial: errors.length > 0 || plan.truncated,
-    },
-  };
-}
-
-export function filterData(itineraries, numAdults, destination) {
-  const results = [];
-  const seenFlights = new Set();
-  const destinationCodes = lookupMap[destination] ?? [destination];
-
-  for (const itinerary of itineraries) {
-    if (!Array.isArray(itinerary.segments) || itinerary.segments.length === 0) continue;
-    const flightKey =
-      `${itinerary.currency}|` +
-      itinerary.segments
-        .map(
-          (segment) =>
-            `${segment.origin}-${segment.destination}:${segment.carrierCode}${segment.flightNumber}:${segment.departureTime}`,
-        )
-        .join('|');
-    if (seenFlights.has(flightKey)) continue;
-    seenFlights.add(flightKey);
-
-    const path = [itinerary.segments[0].origin];
-    const layovers = [];
-    let destinationIndex = -1;
-    itinerary.segments.forEach((segment, index) => {
-      if (index < itinerary.segments.length - 1) layovers.push(segment.destination);
-      if (destinationIndex === -1 && destinationCodes.includes(segment.destination))
-        destinationIndex = index;
-      path.push(segment.destination);
-    });
-    if (destinationIndex === -1) continue;
-
-    const finalDestination = itinerary.segments.at(-1).destination;
-    const isHiddenCity = !destinationCodes.includes(finalDestination);
-    results.push({
-      id: flightKey,
-      airline: itinerary.segments[0].carrierName,
-      path: path.join(' → '),
-      price: itinerary.price,
-      currency: itinerary.currency,
-      duration: itinerary.totalDuration,
-      isHiddenCity,
-      layoverCity: isHiddenCity ? itinerary.segments[destinationIndex].destination : null,
-      nonstop: itinerary.segments.length === 1,
-      bookingLink: getBookingLink(
-        itinerary.segments[0].origin,
-        finalDestination,
-        itinerary.segments[0].departureTime.substring(0, 10),
-        itinerary.segments[0].carrierCode,
-        layovers,
-        numAdults,
-      ),
-      departureTime: itinerary.segments[0].departureTime,
-      arrivalTime: itinerary.segments[destinationIndex].arrivalTime,
-    });
-  }
-  return results;
-}
-
-export function getBookingLink(source, destination, date, airline, layovers, numAdults) {
-  const route = `${encodeURIComponent(source)}-${encodeURIComponent(destination)}/${encodeURIComponent(date)}/${encodeURIComponent(`${numAdults}adults`)}`;
-  const filters = `airlines=~${airline};stops=~${layovers.length};layoverair=${layovers.join(',')}`;
-  return `https://www.kayak.com/flights/${route}?sort=price_a&fs=${encodeURIComponent(filters)}`;
-}
-
-export function OneWayFilterItems(offer, sliceIndex) {
-  const slice = offer.slices[sliceIndex];
-  return {
-    price: offer.total_amount,
-    currency: offer.total_currency,
-    fareType: slice.fare_brand_name,
-    totalDuration: slice.duration,
-    segments: slice.segments.map((segment) => ({
-      origin: segment.origin.iata_code,
-      destination: segment.destination.iata_code,
-      flightNumber: segment.marketing_carrier_flight_number,
-      carrierCode: segment.marketing_carrier.iata_code,
-      carrierName: segment.marketing_carrier.name,
-      departureTime: segment.departing_at,
-      arrivalTime: segment.arriving_at,
-      duration: segment.duration,
-    })),
-  };
-}
-
-export function filterJSONResult(offers, destination) {
-  const destinationCodes = lookupMap[destination] ?? [destination];
-  if (!Array.isArray(offers)) return [];
-  return offers.filter((offer) => {
-    const segments = offer?.slices?.[0]?.segments;
-    return (
-      Number.isFinite(Number(offer?.total_amount)) &&
-      Number(offer.total_amount) > 0 &&
-      /^[A-Z]{3}$/.test(offer?.total_currency ?? '') &&
-      Array.isArray(segments) &&
-      segments.length > 0 &&
-      segments.every(
-        (segment) =>
-          typeof segment?.origin?.iata_code === 'string' &&
-          typeof segment?.destination?.iata_code === 'string' &&
-          typeof segment?.marketing_carrier?.iata_code === 'string' &&
-          typeof segment?.marketing_carrier?.name === 'string' &&
-          typeof segment?.departing_at === 'string' &&
-          typeof segment?.arriving_at === 'string',
-      ) &&
-      segments.some((segment) => destinationCodes.includes(segment.destination.iata_code))
-    );
-  });
+export function searchOneWay(...args) {
+  return createSearch({ store: getStore() })(...args);
 }

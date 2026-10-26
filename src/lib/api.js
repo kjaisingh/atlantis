@@ -26,7 +26,10 @@ async function request(path, options = {}) {
     });
   }
   if (!response.ok) {
-    throw new Error(body?.error || `Request failed (${response.status}).`);
+    const retry = body?.resetAt
+      ? ` Next allowance: ${new Date(body.resetAt).toLocaleString()}.`
+      : '';
+    throw new Error((body?.error || `Request failed (${response.status}).`) + retry);
   }
   if (body === null) throw new Error('Atlantis returned an invalid response.');
   return body;
@@ -42,8 +45,4 @@ export function getAirports(options) {
 
 export function searchFlights(params) {
   return request('/search', { method: 'POST', body: JSON.stringify(params) });
-}
-
-export function subscribe(params) {
-  return request('/subscribe', { method: 'POST', body: JSON.stringify(params) });
 }

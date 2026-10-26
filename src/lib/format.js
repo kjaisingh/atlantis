@@ -8,7 +8,7 @@ export function formatDate(value) {
 }
 
 export function formatAirportTime(value) {
-  // Duffel timestamps describe each airport's local wall clock.
+  // Flight timestamps describe each airport's local wall clock.
   const date = new Date(`${value.slice(0, 19)}Z`);
   if (Number.isNaN(date.getTime())) return value;
   return new Intl.DateTimeFormat('en-US', {
@@ -23,7 +23,8 @@ export function formatAirportTime(value) {
 export function formatDuration(value) {
   const match = /^P(?:(\d+)D)?T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$/.exec(value || '');
   if (!match) return null;
-  const hours = Number(match[1] || 0) * 24 + Number(match[2] || 0);
-  const minutes = Number(match[3] || 0);
+  const total = Number(match[1] || 0) * 1440 + Number(match[2] || 0) * 60 + Number(match[3] || 0);
+  const hours = Math.floor(total / 60);
+  const minutes = total % 60;
   return [hours && `${hours}h`, minutes && `${minutes}m`].filter(Boolean).join(' ') || null;
 }

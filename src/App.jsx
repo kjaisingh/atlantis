@@ -1,11 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AlertCircle, SearchX } from 'lucide-react';
 import Navbar from './components/Navbar.jsx';
 import Hero from './components/Hero.jsx';
 import HowItWorks from './components/HowItWorks.jsx';
 import SearchForm from './components/SearchForm.jsx';
 import ResultsTable from './components/ResultsTable.jsx';
-import SubscribeForm from './components/SubscribeForm.jsx';
 import Spinner from './components/Spinner.jsx';
 import Footer from './components/Footer.jsx';
 import { getAirports, getHealth, searchFlights } from './lib/api.js';
@@ -13,7 +12,7 @@ import { formatDate } from './lib/format.js';
 
 export default function App() {
   const [airports, setAirports] = useState([]);
-  const [capabilities, setCapabilities] = useState({ search: false, subscriptions: false });
+  const [capabilities, setCapabilities] = useState({ search: false });
   const [directoryError, setDirectoryError] = useState(null);
   const [serviceError, setServiceError] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -66,14 +65,6 @@ export default function App() {
       setLoading(false);
     }
   }
-
-  const alertCurrencies = useMemo(() => {
-    if (!results) return [];
-    const outbound = new Set(results.outbound.map((item) => item.currency));
-    if (!results.inbound) return [...outbound];
-    const inbound = new Set(results.inbound.map((item) => item.currency));
-    return [...outbound].filter((currency) => inbound.has(currency));
-  }, [results]);
 
   return (
     <div className="min-h-screen bg-white">
@@ -197,19 +188,6 @@ export default function App() {
                 itineraries={results.inbound}
                 meta={results.meta?.inbound}
               />
-            )}
-            {capabilities.subscriptions && alertCurrencies.length > 0 && (
-              <SubscribeForm
-                key={JSON.stringify(searchParams)}
-                searchParams={searchParams}
-                currencies={alertCurrencies}
-              />
-            )}
-            {!capabilities.subscriptions && (
-              <p className="mt-8 text-center text-sm text-slate-600">
-                Price alerts are unavailable right now. You can still compare flights and open
-                booking searches.
-              </p>
             )}
           </section>
         )}

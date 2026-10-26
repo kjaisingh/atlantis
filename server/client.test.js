@@ -10,6 +10,7 @@ test('flight clocks and calendar dates stay independent of the viewer timezone',
   assert.equal(formatDate('2099-02-28'), 'Feb 28, 2099');
   assert.equal(formatDuration('P1DT2H30M'), '26h 30m');
   assert.equal(formatDuration('PT45M'), '45m');
+  assert.equal(formatDuration('PT175M'), '2h 55m');
   assert.equal(formatDuration(undefined), null);
 });
 

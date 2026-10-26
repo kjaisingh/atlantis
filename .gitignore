@@ -16,6 +16,7 @@
 # browser tests
 /playwright-report
 /test-results
+__pycache__/
 
 # misc
 .DS_Store

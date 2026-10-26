@@ -11,8 +11,11 @@ export default function SearchForm({ airports, onSearch, loading, disabled }) {
   const [travelers, setTravelers] = useState(1);
   const airportCodes = useMemo(() => new Set(airports.map((airport) => airport.code)), [airports]);
   const today = new Date().toISOString().slice(0, 10);
+  const members = (code) => airports.find((airport) => airport.code === code)?.airports || [code];
   const validRoute =
-    airportCodes.has(origin) && airportCodes.has(destination) && origin !== destination;
+    airportCodes.has(origin) &&
+    airportCodes.has(destination) &&
+    !members(origin).some((code) => members(destination).includes(code));
 
   function handleSwap() {
     setOrigin(destination);
@@ -26,7 +29,7 @@ export default function SearchForm({ airports, onSearch, loading, disabled }) {
 
   function handleSubmit(event) {
     event.preventDefault();
-    if (!validRoute) return;
+    if (disabled || loading || !validRoute) return;
     onSearch({
       origin,
       destination,
@@ -49,118 +52,110 @@ export default function SearchForm({ airports, onSearch, loading, disabled }) {
             Compare ordinary fares with hidden-city options.
           </p>
         </div>
-        <fieldset>
-          <legend className="sr-only">Trip type</legend>
-          <div className="inline-flex rounded-full bg-slate-100 p-1 text-sm font-semibold">
-            {[
-              ['oneway', 'One-way'],
-              ['roundtrip', 'Round-trip'],
-            ].map(([value, label]) => (
-              <button
-                key={value}
-                type="button"
-                aria-pressed={tripType === value}
-                onClick={() => setTripType(value)}
-                className={`rounded-full px-4 py-2 transition ${
-                  tripType === value ? 'bg-white text-slate-950 shadow-sm' : 'text-slate-500'
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        </fieldset>
+        <fieldset disabled={disabled || loading} aria-busy={loading}>
+          <legend className="sr-only">Flight details</legend>
+          <fieldset>
+            <legend className="sr-only">Trip type</legend>
+            <div className="inline-flex rounded-full bg-slate-100 p-1 text-sm font-semibold">
+              {[
+                ['oneway', 'One-way'],
+                ['roundtrip', 'Round-trip'],
+              ].map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  aria-pressed={tripType === value}
+                  onClick={() => setTripType(value)}
+                  className={`rounded-full px-4 py-2 transition ${
+                    tripType === value ? 'bg-white text-slate-950 shadow-sm' : 'text-slate-500'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </fieldset>
 
-        <div className="mt-6 grid items-end gap-3 sm:grid-cols-[1fr_auto_1fr]">
-          <AirportCombobox
-            label="Origin"
-            placeholder="Airport or city"
-            airports={airports}
-            value={origin}
-            onChange={setOrigin}
-          />
-          <button
-            type="button"
-            onClick={handleSwap}
-            aria-label="Swap origin and destination"
-            className="mx-auto flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:border-brand-200 hover:text-brand-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
-          >
-            <ArrowLeftRight className="h-4 w-4 sm:rotate-0 rotate-90" />
-          </button>
-          <AirportCombobox
-            label="Destination"
-            placeholder="Airport or city"
-            airports={airports}
-            value={destination}
-            onChange={setDestination}
-          />
-        </div>
-
-        <div
-          className={`mt-4 grid gap-4 ${tripType === 'roundtrip' ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}
-        >
-          <DateField
-            label="Departure"
-            id="departureDate"
-            min={today}
-            value={departureDate}
-            onChange={handleDepartureChange}
-          />
-          {tripType === 'roundtrip' && (
-            <DateField
-              label="Return"
-              id="returnDate"
-              min={departureDate || today}
-              value={returnDate}
-              onChange={setReturnDate}
+          <div className="mt-6 grid items-end gap-3 sm:grid-cols-[1fr_auto_1fr]">
+            <AirportCombobox
+              label="Origin"
+              placeholder="Airport or city"
+              airports={airports}
+              value={origin}
+              onChange={setOrigin}
             />
-          )}
-          <div>
-            <label htmlFor="travelers" className="mb-1.5 block text-sm font-medium text-slate-700">
-              Travelers
-            </label>
-            <div className="relative">
-              <Users className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <input
-                id="travelers"
-                type="number"
-                min="1"
-                max="9"
-                required
-                value={travelers}
-                onChange={(event) => setTravelers(event.target.value)}
-                className="field pl-9"
+            <button
+              type="button"
+              onClick={handleSwap}
+              aria-label="Swap origin and destination"
+              className="mx-auto flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:border-brand-200 hover:text-brand-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+            >
+              <ArrowLeftRight className="h-4 w-4 sm:rotate-0 rotate-90" />
+            </button>
+            <AirportCombobox
+              label="Destination"
+              placeholder="Airport or city"
+              airports={airports}
+              value={destination}
+              onChange={setDestination}
+            />
+          </div>
+
+          <div
+            className={`mt-4 grid gap-4 ${tripType === 'roundtrip' ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}
+          >
+            <DateField
+              label="Departure"
+              id="departureDate"
+              min={today}
+              value={departureDate}
+              onChange={handleDepartureChange}
+            />
+            {tripType === 'roundtrip' && (
+              <DateField
+                label="Return"
+                id="returnDate"
+                min={departureDate || today}
+                value={returnDate}
+                onChange={setReturnDate}
               />
+            )}
+            <div>
+              <label
+                htmlFor="travelers"
+                className="mb-1.5 block text-sm font-medium text-slate-700"
+              >
+                Travelers
+              </label>
+              <div className="relative">
+                <Users className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <input
+                  id="travelers"
+                  type="number"
+                  min="1"
+                  max="9"
+                  required
+                  value={travelers}
+                  onChange={(event) => setTravelers(event.target.value)}
+                  className="field pl-9"
+                />
+              </div>
             </div>
           </div>
-        </div>
 
-        {!validRoute && origin && destination && (
-          <p className="mt-3 text-sm text-amber-700">
-            Choose two different airports from the suggestions.
-          </p>
-        )}
-        <button
-          type="submit"
-          disabled={disabled || loading || !validRoute}
-          className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-brand py-3.5 text-sm font-bold text-white shadow-lg shadow-brand-200 transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          <Search className="h-4 w-4" /> {loading ? 'Searching…' : 'Search flights'}
-        </button>
-        <p className="mt-3 text-center text-xs text-slate-500">
-          Free shared allowance: 10 fresh one-way comparisons daily, 50 per 31 days. Round trips use
-          two; cached fares use none.
-        </p>
-        <p className="mt-4 text-center text-xs leading-5 text-slate-600">
-          Hidden-city tickets need carry-on only and separate tickets for each direction.{' '}
-          <a
-            href="#how-it-works"
-            className="font-semibold text-brand-700 underline underline-offset-2"
+          {!validRoute && origin && destination && (
+            <p className="mt-3 text-sm text-amber-700">
+              Choose airports or metro areas that do not overlap.
+            </p>
+          )}
+          <button
+            type="submit"
+            disabled={disabled || loading || !validRoute}
+            className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-brand py-3.5 text-sm font-bold text-white shadow-lg shadow-brand-200 transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            Read the tradeoffs
-          </a>
-          .
-        </p>
+            <Search className="h-4 w-4" /> {loading ? 'Searching…' : 'Search flights'}
+          </button>
+        </fieldset>
       </form>
     </div>
   );

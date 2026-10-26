@@ -1,11 +1,5 @@
 import { useMemo, useState } from 'react';
-import {
-  AlertTriangle,
-  ArrowUpRight,
-  PlaneTakeoff,
-  SlidersHorizontal,
-  TrendingDown,
-} from 'lucide-react';
+import { ArrowUpRight, PlaneTakeoff, SlidersHorizontal, TrendingDown } from 'lucide-react';
 import { formatAirportTime, formatDuration } from '../lib/format.js';
 
 function formatPrice(value, currency) {
@@ -100,33 +94,12 @@ export default function ResultsTable({ title, itineraries, meta }) {
       {meta?.error && (
         <p role="status" className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-800">
           {meta.error}
+          {meta.resetAt && ` Next allowance: ${new Date(meta.resetAt).toLocaleString()}.`}
         </p>
       )}
-      {meta?.partial && !meta.error && (
-        <p className="mt-3 flex items-start gap-2 rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-800">
-          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-          Limited coverage: {meta.succeeded} of {meta.requested} route checks completed. Only a
-          small set of possible endpoints is checked.
-        </p>
-      )}
-      {meta?.pricedAt && (
+      {meta?.candidates?.length > 0 && (
         <p className="mt-2 text-xs text-slate-500">
-          {meta.fareCached ? 'Cached fares' : 'Fares checked'}:{' '}
-          {new Date(meta.pricedAt).toLocaleString()}. Prices may change before booking.
-        </p>
-      )}
-      {meta?.candidates && (
-        <p className="mt-2 text-xs text-slate-500">
-          {meta.candidates.length
-            ? `Ticket endpoints checked: ${meta.candidates.join(', ')}.`
-            : 'No hidden-city candidates are available for this route.'}{' '}
-          Candidate routes refresh after 30 days; fares refresh after 10 minutes.
-        </p>
-      )}
-      {meta?.available > meta?.returned && (
-        <p className="mt-2 text-xs text-slate-500">
-          Showing up to 10 options per currency, retaining nonstop and hidden-city comparisons when
-          available.
+          Ticket endpoints checked: {meta.candidates.join(', ')}.
         </p>
       )}
 
@@ -159,14 +132,11 @@ export default function ResultsTable({ title, itineraries, meta }) {
       ) : (
         <div className="mt-4 space-y-3">
           {visible.map((itinerary) => (
-            <a
+            <article
               key={
                 itinerary.id ||
                 `${itinerary.path}|${itinerary.departureTime}|${itinerary.price}|${itinerary.currency}`
               }
-              href={itinerary.bookingLink}
-              target="_blank"
-              rel="noopener noreferrer"
               className="group flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-brand-200 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 sm:flex-row sm:items-center sm:justify-between"
             >
               <div className="flex min-w-0 items-start gap-3">
@@ -212,17 +182,54 @@ export default function ResultsTable({ title, itineraries, meta }) {
                       remaining flights.
                     </p>
                   )}
+                  {itinerary.segments?.length > 0 && (
+                    <details className="mt-3 text-xs text-slate-600">
+                      <summary className="cursor-pointer font-semibold text-brand-700">
+                        Flight details
+                      </summary>
+                      <ol className="mt-2 space-y-2">
+                        {itinerary.segments.map((segment, index) => {
+                          const skipped =
+                            itinerary.isHiddenCity &&
+                            index >
+                              itinerary.segments.findIndex(
+                                (leg) => leg.destination === itinerary.layoverCity,
+                              );
+                          return (
+                            <li
+                              key={`${segment.flightNumber}-${index}`}
+                              className={skipped ? 'text-amber-800' : ''}
+                            >
+                              <p className="font-semibold">
+                                {skipped ? 'Skip' : 'Fly'}: {segment.origin} → {segment.destination}{' '}
+                                · {segment.flightNumber}
+                              </p>
+                              <p>
+                                {formatAirportTime(segment.departureTime)} →{' '}
+                                {formatAirportTime(segment.arrivalTime)}
+                              </p>
+                            </li>
+                          );
+                        })}
+                      </ol>
+                    </details>
+                  )}
                 </div>
               </div>
               <div className="flex shrink-0 items-center justify-between gap-4 sm:flex-col sm:items-end">
                 <span className="text-2xl font-extrabold text-slate-950">
                   {formatPrice(itinerary.price, itinerary.currency)}
                 </span>
-                <span className="inline-flex items-center gap-1 text-xs font-semibold text-brand-700">
+                <a
+                  href={itinerary.bookingLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-xs font-semibold text-brand-700 underline underline-offset-4"
+                >
                   Recheck on Google Flights <ArrowUpRight className="h-3.5 w-3.5" />
-                </span>
+                </a>
               </div>
-            </a>
+            </article>
           ))}
         </div>
       )}

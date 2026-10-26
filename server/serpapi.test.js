@@ -78,6 +78,19 @@ test('nonstop fares remain ordinary comparisons and unsafe provider links are re
   assert.equal(new URL(result.bookingLink).hostname, 'www.google.com');
 });
 
+test('invalid local calendar dates and clock times are rejected', () => {
+  for (const time of [
+    '2099-02-30 12:00',
+    '2099-02-28 24:00',
+    '2099-02-28 10:60',
+    '2099-02-28 10:00:60',
+  ]) {
+    const flights = structuredClone(offer.flights);
+    flights[0].arrival_airport.time = time;
+    assert.deepEqual(normalizeOffers({ best_flights: [{ ...offer, flights }] }, options), []);
+  }
+});
+
 test('provider requests use one-way fares and expand only explicitly selected metros', () => {
   const params = requestUrl('NYC', 'DTW', options.date, 2, 'test').searchParams;
   assert.equal(params.get('type'), '2');

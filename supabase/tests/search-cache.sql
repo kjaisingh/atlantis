@@ -4,6 +4,8 @@ declare
   next_row atlantis_route_cache;
   claim jsonb;
   i integer;
+  v_owner uuid := gen_random_uuid();
+  completed jsonb;
 begin
   first_row := atlantis_cache_candidates('JFK', 'DTW', '["ORD"]', '2026-07');
   next_row := atlantis_cache_candidates('JFK', 'DTW', '["ATL"]', '2026-08');
@@ -45,5 +47,32 @@ begin
   assert not has_function_privilege('authenticated', 'atlantis_cache_candidates(text,text,jsonb,text)', 'EXECUTE');
   assert has_function_privilege('service_role', 'atlantis_claim_search(text,uuid,integer)', 'EXECUTE');
   assert not has_table_privilege('anon', 'atlantis_route_cache', 'SELECT');
+
+  perform atlantis_claim_search(repeat('c',64), v_owner, 4);
+  completed := atlantis_finish_search(repeat('c',64), gen_random_uuid(), '{"itineraries":[],"meta":{"failed":0}}');
+  assert completed is null, 'Another owner completed a search';
+  completed := atlantis_finish_search(repeat('c',64), v_owner, '{"itineraries":[],"meta":{"failed":0}}');
+  assert (completed #>> '{meta,fareExpiresAt}')::timestamptz = now() + interval '10 minutes';
+  assert (select expires_at from atlantis_fare_cache where key = repeat('c',64)) = now() + interval '10 minutes';
+  assert atlantis_finish_search(repeat('c',64), v_owner, '{"meta":{"failed":0}}') is null, 'Finished search overwritten';
+
+  perform atlantis_claim_search(repeat('d',64), v_owner, 4);
+  completed := atlantis_finish_search(repeat('d',64), v_owner, '{"itineraries":[],"meta":{"failed":1}}');
+  assert (completed #>> '{meta,fareExpiresAt}')::timestamptz = now() + interval '1 minute';
+  perform atlantis_claim_search(repeat('e',64), v_owner, 4);
+  perform atlantis_finish_search(repeat('e',64), v_owner, '{"status":429,"code":"provider_limit","message":"Quota exhausted"}', true);
+  claim := atlantis_claim_search(repeat('e',64), gen_random_uuid(), 4);
+  assert claim->>'status' = 'failed';
+  assert claim #>> '{result,status}' = '429', 'Cached failure lost status';
+  assert (select expires_at from atlantis_fare_cache where key = repeat('e',64)) = now() + interval '1 minute';
+
+  perform atlantis_claim_search(repeat('f',64), v_owner, 4);
+  update atlantis_fare_cache set expires_at = now() where key = repeat('f',64);
+  assert atlantis_finish_search(repeat('f',64), v_owner, '{"meta":{"failed":0}}') is null, 'Expired lease completed';
+  assert (atlantis_readiness()->>'ready')::boolean = false, 'Missing graph reported ready';
+  insert into atlantis_route_graph(data) values ('{"edges":[["JFK","DTW","DL",100]],"period":"2026-07"}');
+  assert (atlantis_readiness()->>'ready')::boolean = true;
+  assert not has_function_privilege('anon', 'atlantis_finish_search(text,uuid,jsonb,boolean)', 'EXECUTE');
+  assert not has_function_privilege('authenticated', 'atlantis_readiness()', 'EXECUTE');
 end;
 $$;

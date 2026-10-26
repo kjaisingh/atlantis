@@ -9,7 +9,7 @@ export function candidateEndpoints(origin, destination, graph) {
   const carriers = new Set(
     graph.edges
       .filter(([from, to]) => origins.includes(from) && exits.includes(to))
-      .map((edge) => edge[2]),
+      .map((edge) => `${edge[1]}:${edge[2]}`),
   );
   if (!carriers.size) return [];
   const scores = new Map();
@@ -18,7 +18,7 @@ export function candidateEndpoints(origin, destination, graph) {
       !exits.includes(from) ||
       origins.includes(to) ||
       exits.includes(to) ||
-      !carriers.has(carrier)
+      !carriers.has(`${from}:${carrier}`)
     )
       continue;
     scores.set(to, (scores.get(to) ?? 0) + departures);

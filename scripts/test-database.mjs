@@ -4,9 +4,13 @@ import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 
 // All fixtures live in a transaction-local schema; existing app data is untouched.
-const schema = (await readFile(new URL('../supabase/schema.sql', import.meta.url), 'utf8'))
-  .replaceAll('public.', 'atlantis_test.')
-  .replaceAll('search_path = public', 'search_path = atlantis_test');
+const readSql = (path) => readFile(new URL(`../supabase/${path}`, import.meta.url), 'utf8');
+const schemas = [
+  await readSql('schema.sql'),
+  (await readSql('migrations/20261026_search_cache.sql')) +
+    '\n' +
+    (await readSql('migrations/20261026_search_reliability.sql')),
+];
 const assertions = await readFile(
   new URL('../supabase/tests/search-cache.sql', import.meta.url),
   'utf8',
@@ -16,11 +20,14 @@ try {
   const path = join(directory, 'test.sql');
   await writeFile(
     path,
-    `begin;\ncreate schema atlantis_test;\n${schema}\nset search_path = atlantis_test;\n${assertions}\nrollback;`,
+    schemas
+      .map(
+        (schema) =>
+          `begin;\ncreate schema atlantis_test;\n${schema.replaceAll('public.', 'atlantis_test.').replaceAll('search_path = public', 'search_path = atlantis_test')}\nset search_path = atlantis_test;\n${assertions}\nrollback;`,
+      )
+      .join('\n'),
   );
-  if (process.argv.includes('--linked'))
-    execFileSync('supabase', ['db', 'query', '--linked', '--file', path], { stdio: 'inherit' });
-  else execFileSync('psql', ['-v', 'ON_ERROR_STOP=1', '-f', path], { stdio: 'inherit' });
+  execFileSync('psql', ['-v', 'ON_ERROR_STOP=1', '-f', path], { stdio: 'inherit' });
 } finally {
   await rm(directory, { recursive: true, force: true });
 }

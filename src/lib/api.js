@@ -35,14 +35,14 @@ async function request(path, options = {}) {
   return body;
 }
 
-export function getHealth(options) {
-  return request('/health', options);
+export function getReadiness(options) {
+  return request('/ready', options);
 }
 
 export function getAirports(options) {
   return request('/airports', options);
 }
 
-export function searchFlights(params) {
-  return request('/search', { method: 'POST', body: JSON.stringify(params) });
+export function searchFlights(params, options) {
+  return request('/search', { ...options, method: 'POST', body: JSON.stringify(params) });
 }

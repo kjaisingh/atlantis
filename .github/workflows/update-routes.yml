@@ -4,6 +4,11 @@ on:
   schedule:
     - cron: '23 8 5 * *'
   workflow_dispatch:
+    inputs:
+      allow_regression:
+        description: Allow an inspected older or smaller BTS graph
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -18,7 +23,11 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - run: python3 scripts/update-routes.py --publish
+      - run: |
+          args=(--publish)
+          if [ "$ALLOW_REGRESSION" = "true" ]; then args+=(--allow-regression); fi
+          python3 scripts/update-routes.py "${args[@]}"
         env:
+          ALLOW_REGRESSION: ${{ inputs.allow_regression }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}

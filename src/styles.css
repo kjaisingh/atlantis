@@ -59,7 +59,6 @@ input[type='date']::-webkit-calendar-picker-indicator {
 }
 
 .field:focus,
-.dark-field:focus,
 .filter-control:focus {
   border-color: var(--color-brand-500);
   box-shadow: 0 0 0 3px var(--color-brand-100);
@@ -73,16 +72,6 @@ input[type='date']::-webkit-calendar-picker-indicator {
   font-size: 0.75rem;
   font-weight: 600;
   color: #334155;
-  outline: none;
-}
-
-.dark-field {
-  width: 100%;
-  border-radius: 0.75rem;
-  border: 1px solid #334155;
-  background: #1e293b;
-  padding: 0.625rem 0.75rem;
-  color: white;
   outline: none;
 }
 

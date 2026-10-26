@@ -2,8 +2,8 @@ import { createClient } from '@supabase/supabase-js';
 import { SearchError } from './errors.js';
 
 export function createStore(client) {
-  async function result(query) {
-    const { data, error } = await query;
+  async function result(query, { signal } = {}) {
+    const { data, error } = await (signal ? query.abortSignal(signal) : query);
     if (error)
       throw new SearchError('Search storage is unavailable. Please try again later.', {
         status: 503,
@@ -15,46 +15,52 @@ export function createStore(client) {
     return client;
   };
   const table = (name) => requireClient().from(name);
-  const rpc = (name, params) => result(requireClient().rpc(name, params));
+  const rpc = (name, params, options) => result(requireClient().rpc(name, params), options);
   return {
-    getCandidates: (origin, destination) =>
+    getCandidates: (origin, destination, options) =>
       result(
         table('atlantis_route_cache')
           .select('*')
           .eq('origin', origin)
           .eq('destination', destination)
           .maybeSingle(),
+        options,
       ),
-    getGraph: async () =>
-      (await result(table('atlantis_route_graph').select('data').eq('id', true).single())).data,
-    cacheCandidates: (origin, destination, candidates, period) =>
-      rpc('atlantis_cache_candidates', {
-        p_origin: origin,
-        p_destination: destination,
-        p_candidates: candidates,
-        p_source_period: period,
-      }),
-    observe: (origin, destination, createdAt, endpoints) =>
-      rpc('atlantis_observe_routes', {
-        p_origin: origin,
-        p_destination: destination,
-        p_created_at: createdAt,
-        p_endpoints: endpoints,
-      }),
-    claim: (key, owner, calls) =>
-      rpc('atlantis_claim_search', { p_key: key, p_owner: owner, p_calls: calls }),
-    getFare: (key) => result(table('atlantis_fare_cache').select('*').eq('key', key).maybeSingle()),
-    finish: (key, owner, payload, failed = false) =>
-      result(
-        table('atlantis_fare_cache')
-          .update({
-            state: failed ? 'failed' : 'ready',
-            result: payload,
-            expires_at: new Date(Date.now() + (failed ? 60_000 : 600_000)).toISOString(),
-          })
-          .eq('key', key)
-          .eq('owner', owner)
-          .eq('state', 'pending'),
+    getGraph: async (options) =>
+      (await result(table('atlantis_route_graph').select('data').eq('id', true).single(), options))
+        .data,
+    readiness: (options) => rpc('atlantis_readiness', {}, options),
+    cacheCandidates: (origin, destination, candidates, period, options) =>
+      rpc(
+        'atlantis_cache_candidates',
+        {
+          p_origin: origin,
+          p_destination: destination,
+          p_candidates: candidates,
+          p_source_period: period,
+        },
+        options,
+      ),
+    observe: (origin, destination, createdAt, endpoints, options) =>
+      rpc(
+        'atlantis_observe_routes',
+        {
+          p_origin: origin,
+          p_destination: destination,
+          p_created_at: createdAt,
+          p_endpoints: endpoints,
+        },
+        options,
+      ),
+    claim: (key, owner, calls, options) =>
+      rpc('atlantis_claim_search', { p_key: key, p_owner: owner, p_calls: calls }, options),
+    getFare: (key, options) =>
+      result(table('atlantis_fare_cache').select('*').eq('key', key).maybeSingle(), options),
+    finish: (key, owner, payload, failed = false, options) =>
+      rpc(
+        'atlantis_finish_search',
+        { p_key: key, p_owner: owner, p_result: payload, p_failed: failed },
+        options,
       ),
   };
 }
@@ -69,7 +75,12 @@ export function getStore() {
             auth: { persistSession: false, autoRefreshToken: false },
             global: {
               fetch: (url, options) =>
-                fetch(url, { ...options, signal: AbortSignal.timeout(10_000) }),
+                fetch(url, {
+                  ...options,
+                  signal: options?.signal
+                    ? AbortSignal.any([options.signal, AbortSignal.timeout(10_000)])
+                    : AbortSignal.timeout(10_000),
+                }),
             },
           })
         : null,

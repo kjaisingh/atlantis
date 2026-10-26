@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AlertCircle, SearchX } from 'lucide-react';
 import Navbar from './components/Navbar.jsx';
 import Hero from './components/Hero.jsx';
@@ -7,7 +7,7 @@ import SearchForm from './components/SearchForm.jsx';
 import ResultsTable from './components/ResultsTable.jsx';
 import Spinner from './components/Spinner.jsx';
 import Footer from './components/Footer.jsx';
-import { getAirports, getHealth, searchFlights } from './lib/api.js';
+import { getAirports, getReadiness, searchFlights } from './lib/api.js';
 import { formatDate } from './lib/format.js';
 
 export default function App() {
@@ -22,18 +22,22 @@ export default function App() {
   const [attemptedParams, setAttemptedParams] = useState(null);
   const [initializing, setInitializing] = useState(true);
   const [connectionAttempt, setConnectionAttempt] = useState(0);
+  const searchRequest = useRef(null);
+
+  useEffect(() => () => searchRequest.current?.abort(), []);
 
   useEffect(() => {
     const controller = new AbortController();
     const options = { signal: controller.signal };
-    Promise.allSettled([getAirports(options), getHealth(options)]).then(
+    Promise.allSettled([getAirports(options), getReadiness(options)]).then(
       ([airportResult, healthResult]) => {
         if (controller.signal.aborted) return;
         if (airportResult.status === 'fulfilled') setAirports(airportResult.value);
         else setDirectoryError('Airport directory failed to load. Please retry.');
-        if (healthResult.status === 'fulfilled' && healthResult.value.capabilities?.search) {
-          setCapabilities(healthResult.value.capabilities);
+        if (healthResult.status === 'fulfilled' && healthResult.value.ready) {
+          setCapabilities({ search: true });
         } else {
+          setCapabilities({ search: false });
           setServiceError('Flight search is unavailable right now. Please try again later.');
         }
         setInitializing(false);
@@ -50,19 +54,27 @@ export default function App() {
   }
 
   async function handleSearch(params) {
+    if (searchRequest.current) return;
+    const controller = new AbortController();
+    searchRequest.current = controller;
     setLoading(true);
     setError(null);
     setResults(null);
     setSearchParams(null);
     setAttemptedParams(params);
     try {
-      const response = await searchFlights(params);
+      const response = await searchFlights(params, { signal: controller.signal });
+      if (controller.signal.aborted || searchRequest.current !== controller) return;
       setResults(response);
       setSearchParams(params);
     } catch (searchError) {
+      if (controller.signal.aborted || searchRequest.current !== controller) return;
       setError(searchError.message);
     } finally {
-      setLoading(false);
+      if (searchRequest.current === controller) {
+        searchRequest.current = null;
+        if (!controller.signal.aborted) setLoading(false);
+      }
     }
   }
 
@@ -132,6 +144,7 @@ export default function App() {
               </p>
               <button
                 type="button"
+                disabled={loading}
                 onClick={() => handleSearch(attemptedParams)}
                 className="mt-3 rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold"
               >
@@ -169,6 +182,7 @@ export default function App() {
             {(results.meta?.outbound?.error || results.meta?.inbound?.error) && (
               <button
                 type="button"
+                disabled={loading}
                 onClick={() => handleSearch(searchParams)}
                 className="mt-4 rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold"
               >

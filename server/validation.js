@@ -41,8 +41,8 @@ export function validateTrip(body, airportSet, now = new Date()) {
   if (!airportSet.has(origin) || !airportSet.has(destination)) {
     return { error: 'Unknown origin or destination airport code.' };
   }
-  if (origin === destination) {
-    return { error: 'Origin and destination must differ.' };
+  if (airportCodes(origin).some((code) => airportCodes(destination).includes(code))) {
+    return { error: 'Origin and destination must not include the same airport.' };
   }
   if (!isValidFutureDate(departureDate, now)) {
     return { error: 'Departure date must be a real, non-past calendar date.' };
@@ -59,3 +59,4 @@ export function validateTrip(body, airportSet, now = new Date()) {
 
   return { value: { origin, destination, departureDate, returnDate, travelers } };
 }
+import { airportCodes } from './route-graph.js';

@@ -5,6 +5,31 @@ import { isValidFutureDate, todayUtc, validateTrip } from './validation.js';
 const now = new Date('2026-10-13T12:00:00Z');
 const airports = new Set(['JFK', 'DTW']);
 
+test('metro selections cannot include the opposite endpoint airport', () => {
+  const directory = new Set(['NYC', 'JFK', 'EWR', 'DTW']);
+  for (const [origin, destination] of [
+    ['NYC', 'JFK'],
+    ['EWR', 'NYC'],
+    ['JFK', 'JFK'],
+  ]) {
+    assert.match(
+      validateTrip(
+        { origin, destination, departureDate: '2099-02-28', travelers: 1 },
+        directory,
+        now,
+      ).error,
+      /same airport/,
+    );
+  }
+  assert.ok(
+    validateTrip(
+      { origin: 'NYC', destination: 'DTW', departureDate: '2099-02-28', travelers: 1 },
+      directory,
+      now,
+    ).value,
+  );
+});
+
 test('numeric fields reject booleans, arrays, objects, and empty values', () => {
   for (const value of [true, false, null, [], [2], {}, '', ' ']) {
     assert.ok(

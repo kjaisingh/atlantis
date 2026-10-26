@@ -33,6 +33,49 @@ test('health exposes safe capabilities and deployment version', async () => {
     capabilities: { search: true, databaseConfigured: false },
   });
 });
+
+test('readiness checks database and graph, caches concurrent probes, and hides errors', async () => {
+  for (const state of ['ready', 'empty', 'offline', 'unconfigured']) {
+    let calls = 0;
+    const app = createApp({
+      config: { ...config, searchConfigured: state !== 'unconfigured' },
+      readiness: async () => {
+        calls++;
+        if (state === 'offline') throw new Error('secret database detail');
+        return { ready: state === 'ready', internal: 'private' };
+      },
+    });
+    const instance = app.listen(0);
+    await new Promise((resolve) => instance.once('listening', resolve));
+    try {
+      const url = `http://127.0.0.1:${instance.address().port}/api/ready`;
+      const responses = await Promise.all([fetch(url), fetch(url)]);
+      for (const response of responses) {
+        assert.equal(response.status, state === 'ready' ? 200 : 503);
+        assert.equal(response.headers.get('cache-control'), 'no-store');
+        assert.doesNotMatch(await response.text(), /secret|private/);
+      }
+      assert.equal(calls, state === 'unconfigured' ? 0 : 1);
+    } finally {
+      await new Promise((resolve) => instance.close(resolve));
+    }
+  }
+});
+
+test('overlapping metro routes are rejected before search reservation', async () => {
+  const response = await fetch(`${baseUrl}/api/search`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      origin: 'NYC',
+      destination: 'JFK',
+      departureDate: '2099-02-28',
+      travelers: 1,
+    }),
+  });
+  assert.equal(response.status, 400);
+  assert.match((await response.json()).error, /same airport/);
+});
 test('invalid JSON and impossible dates return 400', async () => {
   const invalidJson = await fetch(`${baseUrl}/api/search`, {
     method: 'POST',

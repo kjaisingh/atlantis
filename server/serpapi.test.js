@@ -32,7 +32,8 @@ test('hidden-city fares preserve the full ticket and stop displayed arrival at t
   assert.equal(result.isHiddenCity, true);
   assert.equal(result.nonstop, false);
   assert.equal(result.price, 174);
-  assert.match(result.bookingLink, /^https:\/\/www.google.com\/travel\/flights/);
+  assert.equal(new URL(result.bookingLink).origin, 'https://www.google.com');
+  assert.equal(new URL(result.bookingLink).pathname, '/travel/flights');
 });
 
 test('reject wrong boarding origins, disconnected segments, missing exits and wrong endpoints', () => {

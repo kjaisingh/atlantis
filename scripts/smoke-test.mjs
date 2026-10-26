@@ -50,19 +50,29 @@ function monitor(page, label, isExpectedConsoleError = () => false) {
 
 async function mockApi(page) {
   if (live) return;
-  await page.route('**/api/health', (route) =>
+  await page.route('**/api/ready', (route) =>
     route.fulfill({
       json: {
-        status: 'ok',
+        ready: true,
         version: 'smoke',
-        capabilities: { search: true, databaseConfigured: true },
       },
     }),
   );
   await page.route('**/api/airports', (route) =>
     route.fulfill({
       json: [
-        { code: 'JFK', city: 'New York', name: 'John F. Kennedy International Airport' },
+        {
+          code: 'JFK',
+          city: 'New York',
+          name: 'John F. Kennedy International Airport',
+          airports: ['JFK'],
+        },
+        {
+          code: 'NYC',
+          city: 'New York',
+          name: 'All airports (JFK, EWR, LGA)',
+          airports: ['JFK', 'EWR', 'LGA'],
+        },
         { code: 'DTW', city: 'Detroit', name: 'Detroit Metropolitan Airport' },
       ],
     }),
@@ -90,6 +100,23 @@ async function mockApi(page) {
             nonstop: false,
             isHiddenCity: true,
             layoverCity: 'DTW',
+            finalDestination: 'ORD',
+            segments: [
+              {
+                origin: 'JFK',
+                destination: 'DTW',
+                flightNumber: 'EX 1',
+                departureTime: '2099-02-28T08:00:00',
+                arrivalTime: '2099-02-28T10:00:00',
+              },
+              {
+                origin: 'DTW',
+                destination: 'ORD',
+                flightNumber: 'EX 2',
+                departureTime: '2099-02-28T11:00:00',
+                arrivalTime: '2099-02-28T12:00:00',
+              },
+            ],
             departureTime: '2099-02-28T08:00:00Z',
             arrivalTime: '2099-02-28T10:00:00Z',
             bookingLink: 'https://example.com/hidden',
@@ -171,14 +198,25 @@ async function runDesktop() {
   await page.locator('#departureDate').fill('2099-02-28');
   await page.getByRole('button', { name: 'Search flights' }).click();
   await page.getByText('$188.00').waitFor();
-  await page.getByText('Cached fares:', { exact: false }).waitFor();
+  if (
+    await page
+      .getByText(
+        /Cached fares:|Fares checked:|Limited coverage:|Candidate routes refresh|Free shared allowance/,
+      )
+      .count()
+  )
+    throw new Error('Removed metadata copy reappeared.');
   await page.getByText('Ticket endpoints checked: ORD.', { exact: false }).waitFor();
-  await page.getByText('Feb 28, 8:00 AM → Feb 28, 10:00 AM').waitFor();
+  await page.getByText('Feb 28, 8:00 AM → Feb 28, 10:00 AM').first().waitFor();
   await page.getByText('Feb 28, 2099 · 1 traveler · Economy').waitFor();
-  await page.locator('a').filter({ hasText: 'Hidden-city' }).waitFor();
+  await page.locator('article').filter({ hasText: 'Hidden-city' }).waitFor();
   await page.getByRole('combobox', { name: 'Sort' }).selectOption('departure');
-  const direct = page.locator('a[href="https://example.com/direct"]');
-  const hidden = page.locator('a[href="https://example.com/hidden"]');
+  const direct = page
+    .locator('article')
+    .filter({ has: page.locator('a[href="https://example.com/direct"]') });
+  const hidden = page
+    .locator('article')
+    .filter({ has: page.locator('a[href="https://example.com/hidden"]') });
   if (await direct.getByText('Lowest price').count()) {
     throw new Error('Departure sort marked the higher fare as lowest price.');
   }
@@ -187,6 +225,9 @@ async function runDesktop() {
   }
   await page.getByText('Save $126.00 versus the $314.00 nonstop fare').waitFor();
   await page.getByText('Board at JFK; exit at DTW.', { exact: false }).waitFor();
+  await hidden.getByText('Flight details', { exact: true }).click();
+  await hidden.getByText('Fly: JFK → DTW · EX 1').waitFor();
+  await hidden.getByText('Skip: DTW → ORD · EX 2').waitFor();
   await page.screenshot({ path: `${outDir}/results-desktop.png`, fullPage: true });
   if (!live) {
     expectSearchFailure = true;
@@ -244,11 +285,9 @@ async function runRecoveryStates() {
   monitor(page, 'recovery', (message) => message.text().includes('503 (Service Unavailable)'));
   await mockApi(page);
   let connected = false;
-  await page.route('**/api/health', (route) =>
+  await page.route('**/api/ready', (route) =>
     route.fulfill(
-      connected
-        ? { json: { capabilities: { search: true } } }
-        : { status: 503, json: { error: 'Unavailable' } },
+      connected ? { json: { ready: true } } : { status: 503, json: { error: 'Unavailable' } },
     ),
   );
   await page.goto(baseUrl, { waitUntil: 'networkidle' });
@@ -256,7 +295,7 @@ async function runRecoveryStates() {
   connected = true;
   await page.getByRole('button', { name: 'Retry connection' }).click();
   await page.getByRole('combobox', { name: 'Origin' }).fill('JFK');
-  await page.getByRole('option', { name: /JFK/ }).click();
+  await page.getByRole('option', { name: /^JFK / }).click();
   await page.getByRole('combobox', { name: 'Destination' }).fill('DTW');
   await page.getByRole('option', { name: /DTW/ }).click();
   await page.locator('#departureDate').fill('2099-02-28');
@@ -285,6 +324,7 @@ async function runRecoveryStates() {
       inbound: {
         partial: true,
         error: 'This direction could not be checked. Please retry your search.',
+        resetAt: '2099-03-01T12:00:00Z',
       },
     },
   };
@@ -292,6 +332,7 @@ async function runRecoveryStates() {
   await page.locator('#returnDate').fill('2099-03-01');
   await page.getByRole('button', { name: 'Search flights' }).click();
   await page.getByText('This direction could not be checked.', { exact: false }).waitFor();
+  await page.getByText('Next allowance:', { exact: false }).waitFor();
   await page.getByText('€100.00').waitFor();
   await page.getByText('Travel time: 2h').waitFor();
   await page.getByRole('combobox', { name: 'Outbound itinerary type' }).selectOption('hidden');
@@ -309,11 +350,62 @@ async function runRecoveryStates() {
   await context.close();
 }
 
+async function runPendingSearch() {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const page = await context.newPage();
+  monitor(page, 'pending');
+  await mockApi(page);
+  await page.goto(baseUrl, { waitUntil: 'networkidle' });
+  await page.getByRole('combobox', { name: 'Origin' }).fill('NYC');
+  await page.getByRole('option', { name: /^NYC / }).click();
+  await page.getByRole('combobox', { name: 'Destination' }).fill('JFK');
+  await page.getByRole('option', { name: /^JFK / }).click();
+  await page.getByText('Choose airports or metro areas that do not overlap.').waitFor();
+  if (!(await page.getByRole('button', { name: 'Search flights' }).isDisabled()))
+    throw new Error('Overlapping route can be submitted.');
+  await page.getByRole('combobox', { name: 'Destination' }).fill('DTW');
+  await page.getByRole('option', { name: /^DTW / }).click();
+  await page.locator('#departureDate').fill('2099-02-28');
+  let release;
+  let calls = 0;
+  const gate = new Promise((resolve) => {
+    release = resolve;
+  });
+  await page.route('**/api/search', async (route) => {
+    calls++;
+    await gate;
+    await route.fulfill({ json: { outbound: [], meta: { outbound: { candidates: [] } } } });
+  });
+  try {
+    await page.getByRole('button', { name: 'Search flights' }).click();
+    await page.getByRole('button', { name: 'Searching…' }).waitFor();
+    if (
+      !(await page
+        .locator('form input, form button')
+        .evaluateAll((elements) => elements.every((e) => e.matches(':disabled'))))
+    )
+      throw new Error('Pending form remains editable.');
+    await page.getByRole('form', { name: 'Flight search' }).evaluate((form) => {
+      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    });
+    release();
+    await page.getByText('No fares found for this date and route.', { exact: false }).waitFor();
+    if (calls !== 1) throw new Error('Duplicate searches reached the API.');
+    if (await page.getByRole('combobox', { name: 'Origin' }).isDisabled())
+      throw new Error('Form remained locked after completion.');
+  } finally {
+    release();
+    await context.close();
+  }
+}
+
 try {
   await runDesktop();
   await runMobile();
   if (!live) {
     await runRecoveryStates();
+    await runPendingSearch();
   }
   if (failures.length) throw new Error(failures.join('\n'));
   console.log(`Smoke test passed. Screenshots: ${outDir}`);

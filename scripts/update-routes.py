@@ -89,9 +89,23 @@ def build_graph(rows, airports):
     }
 
 
-def publish(graph):
+def validate_update(graph, current, allow_regression=False):
+    if not current or allow_regression:
+        return
+    if graph['period'] < current['period']:
+        raise ValueError('Refusing to replace the route graph with an older reporting period')
+    if len(graph['edges']) < len(current['edges']) * 0.8:
+        raise ValueError('Route graph shrank by over 20%; inspect BTS data before using --allow-regression')
+
+
+def publish(graph, allow_regression=False):
     url = os.environ["SUPABASE_URL"].rstrip("/") + "/rest/v1/atlantis_route_graph?on_conflict=id"
     key = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
+    headers = {"apikey": key, "Authorization": "Bearer " + key}
+    current_url = os.environ["SUPABASE_URL"].rstrip('/') + '/rest/v1/atlantis_route_graph?id=eq.true&select=data'
+    with urllib.request.urlopen(urllib.request.Request(current_url, headers=headers), timeout=30) as response:
+        current = json.loads(response.read(5_000_000))
+    validate_update(graph, current[0]['data'] if current else None, allow_regression)
     request = urllib.request.Request(url, method="POST",
         data=json.dumps({"id": True, "data": graph, "updated_at": graph["fetchedAt"]}).encode(),
         headers={"apikey": key, "Authorization": "Bearer " + key,
@@ -105,6 +119,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--zip", type=Path, help="Import an official BTS ZIP already downloaded")
     parser.add_argument("--publish", action="store_true", help="Publish to configured Supabase project")
+    parser.add_argument("--allow-regression", action="store_true", help="Allow an inspected older or smaller route graph")
     args = parser.parse_args()
     if args.zip:
         rows = read_rows(args.zip.read_bytes())
@@ -117,7 +132,7 @@ def main():
             rows += download(latest_year - 1)
     graph = build_graph(rows, set((ROOT / "server/data/airports.txt").read_text().split()))
     if args.publish:
-        publish(graph)
+        publish(graph, args.allow_regression)
         print(f"Published {len(graph['edges'])} carrier routes through {graph['period']}.")
     else:
         print(json.dumps(graph, separators=(",", ":")))

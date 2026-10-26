@@ -7,6 +7,7 @@ import helmet from 'helmet';
 import { loadConfig } from './config.js';
 import { createRoutes } from './routes.js';
 import { searchOneWay } from './search.js';
+import { getStore } from './db.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const pageLimiter = rateLimit({
@@ -16,7 +17,11 @@ const pageLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-export function createApp({ config = loadConfig(), searchFlights = searchOneWay } = {}) {
+export function createApp({
+  config = loadConfig(),
+  searchFlights = searchOneWay,
+  readiness = () => getStore().readiness(),
+} = {}) {
   const app = express();
   app.disable('x-powered-by');
   app.set('trust proxy', 1);
@@ -46,6 +51,7 @@ export function createApp({ config = loadConfig(), searchFlights = searchOneWay 
   });
 
   app.get('/api/health', (_request, response) => {
+    response.set('Cache-Control', 'no-store');
     response.json({
       status: 'ok',
       version: config.commitSha,
@@ -54,6 +60,23 @@ export function createApp({ config = loadConfig(), searchFlights = searchOneWay 
         databaseConfigured: config.persistenceEnabled,
       },
     });
+  });
+
+  let readyCheck;
+  let checkedAt = 0;
+  app.get('/api/ready', async (_request, response) => {
+    response.set('Cache-Control', 'no-store');
+    if (!config.searchConfigured) return response.status(503).json({ ready: false });
+    if (!readyCheck || Date.now() - checkedAt >= 15_000) {
+      checkedAt = Date.now();
+      readyCheck = Promise.resolve()
+        .then(readiness)
+        .catch(() => ({ ready: false }));
+    }
+    const result = await readyCheck;
+    response
+      .status(result?.ready ? 200 : 503)
+      .json({ ready: Boolean(result?.ready), version: config.commitSha });
   });
 
   app.use('/api', createRoutes({ config, searchFlights }));

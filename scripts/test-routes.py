@@ -33,6 +33,15 @@ class RouteTests(unittest.TestCase):
         self.assertEqual(max(form.years), 2025)
         self.assertEqual(form.values, {"__VIEWSTATE": "abc"})
 
+    def test_publication_rejects_older_or_incomplete_replacements(self):
+        current = {'period': '2026-07', 'edges': [None] * 100}
+        routes.validate_update({'period': '2026-08', 'edges': [None] * 95}, current)
+        routes.validate_update(current, None)
+        for graph in [{'period': '2026-06', 'edges': [None] * 100}, {'period': '2026-08', 'edges': [None] * 79}]:
+            with self.assertRaises(ValueError):
+                routes.validate_update(graph, current)
+            routes.validate_update(graph, current, allow_regression=True)
+
 
 if __name__ == "__main__":
     unittest.main()

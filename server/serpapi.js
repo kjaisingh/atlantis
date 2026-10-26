@@ -91,6 +91,14 @@ function bookingLink(data, origin, finalDestination, date, travelers) {
 const codePattern = /^[A-Z]{3}$/;
 const timePattern = /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(?::\d{2})?$/;
 
+function validTime(value) {
+  if (typeof value !== 'string' || !timePattern.test(value)) return false;
+  const normalized = value.replace(' ', 'T');
+  const full = normalized.length === 16 ? `${normalized}:00` : normalized;
+  const date = new Date(`${full}Z`);
+  return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 19) === full;
+}
+
 export function normalizeOffers(data, { origin, destination, endpoint, date, travelers }) {
   const origins = airportCodes(origin);
   const exits = airportCodes(destination);
@@ -114,10 +122,12 @@ export function normalizeOffers(data, { origin, destination, endpoint, date, tra
         (f) =>
           codePattern.test(f?.departure_airport?.id ?? '') &&
           codePattern.test(f?.arrival_airport?.id ?? '') &&
-          timePattern.test(f?.departure_airport?.time ?? '') &&
-          timePattern.test(f?.arrival_airport?.time ?? '') &&
+          validTime(f?.departure_airport?.time) &&
+          validTime(f?.arrival_airport?.time) &&
           typeof f.flight_number === 'string' &&
-          typeof f.airline === 'string',
+          f.flight_number.trim() !== '' &&
+          typeof f.airline === 'string' &&
+          f.airline.trim() !== '',
       )
     )
       return [];

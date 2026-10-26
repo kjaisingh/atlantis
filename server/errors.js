@@ -6,3 +6,9 @@ export class SearchError extends Error {
     this.resetAt = resetAt;
   }
 }
+
+export function publicError(error) {
+  return error instanceof SearchError
+    ? error
+    : new SearchError('Flight search failed. Please try again shortly.');
+}

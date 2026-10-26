@@ -8,16 +8,16 @@ Hidden-city travel carries risks: checked bags may continue to the ticketed dest
 
 - Search one-way or round-trip flights by airport or metro area and traveler count.
 - Compare nonstop and hidden-city routes; filter or sort by price, route, and departure time.
-- See the full ticket route, where to exit, airport-local times, and fare freshness.
+- See the checked ticket endpoints and expand flight details to identify each flown or skipped segment.
 - Retain successful results when one round-trip direction fails.
-- Reuse route candidates for 30 days and exact fares for 10 minutes.
+- Reuse route candidates for 30 days and complete fare results for 10 minutes; partial results retry after one minute.
 
 ## Architecture
 
-- React and Vite provide the client; Express serves the API and built app on Render.
-- Official [BTS T-100 passenger segments](https://www.transtats.bts.gov/DL_SelectFields.aspx?gnoyr_VQ=FMG&QO_fu146_anzr=Air%20Carriers) rank up to three onward airports by recent same-carrier service. A monthly job refreshes this historical graph in Supabase. It suggests routes, not guaranteed connections.
+- React and Vite provide the client; Express serves the API and built app on Render. `/api/health` checks the process; `/api/ready` checks database access and route-data availability.
+- Official [BTS T-100 passenger segments](https://www.transtats.bts.gov/DL_SelectFields.aspx?gnoyr_VQ=FMG&QO_fu146_anzr=Air%20Carriers) rank up to three onward airports using the latest three reporting months. Each connection must join at the same airport on the same carrier. A monthly job refreshes this historical graph in Supabase, rejecting older data or a drop of over 20% in route count. It suggests routes, not guaranteed connections.
 - SerpApi's Google Flights API prices the requested route plus those endpoints. Only complete itineraries starting at the selected origin and passing through the requested destination qualify. Coverage is limited, especially outside the US.
-- Supabase stores origin/destination candidates with a fixed 30-day expiry, observed hidden-city endpoints, and separate 10-minute fare caches. Atomic reservations share concurrent searches and cap fresh one-way comparisons at 10 per rolling day, 50 per rolling 31 days, and 200 provider calls per rolling 31 days. Round trips count as two comparisons; cached fares consume no provider allowance. Failed requests still count.
+- Supabase stores origin/destination candidates with a fixed 30-day expiry and observed hidden-city endpoints. Complete fares cache for 10 minutes; partial results and failures cache for one minute. Atomic reservations share concurrent searches and cap fresh one-way comparisons at 10 per rolling day, 50 per rolling 31 days, and 200 provider calls per rolling 31 days. Round trips count as two comparisons; cached fares consume no provider allowance. Failed requests still count. Results show up to 10 options per currency, preserving nonstop and hidden-city comparisons.
 
 ## Setup
 

@@ -3,7 +3,7 @@ import express from 'express';
 import rateLimit from 'express-rate-limit';
 import { validateTrip } from './validation.js';
 import { SEARCH_TIMEOUT_MS } from './serpapi.js';
-import { SearchError } from './errors.js';
+import { publicError } from './errors.js';
 
 const readJson = (name) =>
   JSON.parse(readFileSync(new URL(`./data/${name}.json`, import.meta.url)));
@@ -14,11 +14,17 @@ const names = readJson('airport-names');
 const metros = readJson('lookup-map');
 const metroNames = readJson('metro-names');
 const directory = [
-  ...airports.map((code) => ({ code, city: names[code]?.city, name: names[code]?.name })),
+  ...airports.map((code) => ({
+    code,
+    city: names[code]?.city,
+    name: names[code]?.name,
+    airports: [code],
+  })),
   ...Object.entries(metros).map(([code, members]) => ({
     code,
     city: metroNames[code]?.city,
     name: `All airports (${members.join(', ')})`,
+    airports: members,
   })),
 ];
 const airportSet = new Set(directory.map((x) => x.code));
@@ -36,12 +42,6 @@ export function selectResults(items) {
     if (hidden && !selected.includes(hidden)) selected[selected.length - 1] = hidden;
     return selected;
   });
-}
-
-function publicError(error) {
-  return error instanceof SearchError
-    ? error
-    : new SearchError('Flight search failed. Please try again shortly.');
 }
 
 export function createRoutes({ config, searchFlights }) {

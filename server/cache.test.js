@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createSearch } from './search.js';
 import { candidateEndpoints } from './route-graph.js';
+import { SearchError } from './errors.js';
 
 const DAY = 86400000;
 const graph = {
@@ -59,7 +60,7 @@ function harness() {
         owner,
         result,
         state: failed ? 'failed' : 'ready',
-        expires_at: new Date(time + (failed ? 60000 : 600000)).toISOString(),
+        expires_at: new Date(time + (failed || result.meta.failed ? 60000 : 600000)).toISOString(),
       });
     },
     async observe(_o, _d, createdAt, endpoints) {
@@ -108,6 +109,17 @@ const run = (search, date = '2099-02-28', travelers = 1) => search('JFK', 'DTW',
 test('graph ranks same-carrier onward service and excludes starting/exit airports', () => {
   assert.deepEqual(candidateEndpoints('JFK', 'DTW', graph), ['ATL', 'ORD']);
   assert.deepEqual(candidateEndpoints('BOS', 'DTW', graph), []);
+});
+
+test('metro onward service must leave the same airport the first carrier reaches', () => {
+  const graph = {
+    edges: [
+      ['JFK', 'DCA', 'AA', 100],
+      ['IAD', 'LAX', 'AA', 1000],
+      ['DCA', 'ORD', 'AA', 100],
+    ],
+  };
+  assert.deepEqual(candidateEndpoints('JFK', 'WAS', graph), ['ORD']);
 });
 
 test('route cache survives dates, party sizes and fare expiry; refreshes exactly at 30 days', async () => {
@@ -164,7 +176,70 @@ test('partial provider failure preserves usable fares; full failure is negativel
     },
   });
   await assert.rejects(run(failing), /offline/);
-  await assert.rejects(run(failing), /recently failed/);
+  await assert.rejects(run(failing), /Flight search failed/);
+});
+
+test('partial fares expire after a minute and can recover without changing route candidates', async () => {
+  const h = harness();
+  const search = createSearch({
+    ...h,
+    lookup: (...args) =>
+      args[1] === 'ATL' ? Promise.reject(new Error('offline')) : h.lookup(...args),
+  });
+  await run(search);
+  h.advance(59999);
+  assert.equal((await run(search)).meta.fareCached, true);
+  h.advance(1);
+  const recovered = await run(createSearch(h));
+  assert.equal(recovered.meta.fareCached, false);
+  assert.equal(recovered.meta.partial, false);
+  assert.equal(recovered.meta.failed, 0);
+  assert.equal(h.graphReads, 1);
+});
+
+test('cached failures preserve quota status and reset time', async () => {
+  const h = harness();
+  const error = new SearchError('Provider quota exhausted.', {
+    status: 429,
+    code: 'provider_limit',
+    resetAt: '2099-03-01T12:00:00Z',
+  });
+  const search = createSearch({
+    ...h,
+    lookup: async () => {
+      throw error;
+    },
+  });
+  for (let i = 0; i < 2; i++)
+    await assert.rejects(
+      run(search),
+      (e) => e.status === 429 && e.code === error.code && e.resetAt === error.resetAt,
+    );
+  assert.equal(h.reservations.length, 1);
+});
+
+test('observation and cache write failures retain usable fares after quota reservation', async (t) => {
+  t.mock.method(console, 'warn', () => {});
+  for (const method of ['observe', 'finish']) {
+    const h = harness();
+    h.store[method] = async () => {
+      throw new Error('storage offline');
+    };
+    const result = await run(createSearch(h));
+    assert.equal(result.itineraries.length, 3);
+    assert.equal(h.reservations.length, 1);
+  }
+});
+
+test('an already aborted search never reserves quota or calls the provider', async () => {
+  const h = harness();
+  const controller = new AbortController();
+  controller.abort();
+  await assert.rejects(
+    createSearch(h)('JFK', 'DTW', '2099-02-28', 1, { signal: controller.signal }),
+  );
+  assert.equal(h.reservations.length, 0);
+  assert.equal(h.queries, 0);
 });
 
 test('budget exhaustion and storage failure prevent any provider calls', async () => {

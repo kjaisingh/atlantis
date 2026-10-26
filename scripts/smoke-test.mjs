@@ -6,8 +6,8 @@ const port = 4173;
 const baseUrl = process.env.SMOKE_URL || `http://127.0.0.1:${port}`;
 const outDir = process.env.SMOKE_OUT || '/tmp/atlantis-smoke';
 const live = process.env.SMOKE_LIVE === '1';
-if (live && !process.env.SMOKE_URL && !process.env.DUFFEL_API_KEY) {
-  throw new Error('SMOKE_LIVE=1 requires DUFFEL_API_KEY for a local server, or SMOKE_URL.');
+if (live && !process.env.SMOKE_URL && !process.env.SERPAPI_API_KEY) {
+  throw new Error('SMOKE_LIVE=1 requires SERPAPI_API_KEY for a local server, or SMOKE_URL.');
 }
 await mkdir(outDir, { recursive: true });
 
@@ -17,7 +17,7 @@ if (!process.env.SMOKE_URL) {
     env: {
       ...process.env,
       PORT: String(port),
-      DUFFEL_API_KEY: live ? process.env.DUFFEL_API_KEY : 'smoke-test-only',
+      SERPAPI_API_KEY: live ? process.env.SERPAPI_API_KEY : 'smoke-test-only',
       NODE_ENV: 'test',
     },
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -33,7 +33,7 @@ if (!process.env.SMOKE_URL) {
   }
 }
 
-const browser = await chromium.launch();
+const browser = await chromium.launch({ channel: process.env.PLAYWRIGHT_CHANNEL || undefined });
 const failures = [];
 
 function monitor(page, label, isExpectedConsoleError = () => false) {
@@ -48,14 +48,14 @@ function monitor(page, label, isExpectedConsoleError = () => false) {
   );
 }
 
-async function mockApi(page, subscriptions = true) {
+async function mockApi(page) {
   if (live) return;
   await page.route('**/api/health', (route) =>
     route.fulfill({
       json: {
         status: 'ok',
         version: 'smoke',
-        capabilities: { search: true, subscriptions, databaseConfigured: true },
+        capabilities: { search: true, databaseConfigured: true },
       },
     }),
   );
@@ -102,14 +102,16 @@ async function mockApi(page, subscriptions = true) {
             failed: 0,
             truncated: false,
             totalCandidates: 4,
-            partial: false,
+            partial: true,
+            fareCached: true,
+            pricedAt: '2099-01-01T12:00:00Z',
+            candidates: ['ORD'],
+            candidatesExpiresAt: '2099-01-31T12:00:00Z',
+            sourcePeriod: '2098-10',
           },
         },
       },
     }),
-  );
-  await page.route('**/api/subscribe', (route) =>
-    route.fulfill({ status: 201, json: { id: 'test', message: 'Price alert created.' } }),
   );
 }
 
@@ -120,11 +122,7 @@ async function runDesktop() {
   });
   const page = await context.newPage();
   let expectSearchFailure = false;
-  monitor(
-    page,
-    'desktop',
-    (message) => expectSearchFailure && message.text().includes('502 (Bad Gateway)'),
-  );
+  monitor(page, 'desktop', (message) => expectSearchFailure && /502|429/.test(message.text()));
   await mockApi(page);
   await page.goto(baseUrl, { waitUntil: 'networkidle' });
   const searchBox = await page.getByRole('form', { name: 'Flight search' }).boundingBox();
@@ -173,6 +171,8 @@ async function runDesktop() {
   await page.locator('#departureDate').fill('2099-02-28');
   await page.getByRole('button', { name: 'Search flights' }).click();
   await page.getByText('$188.00').waitFor();
+  await page.getByText('Cached fares:', { exact: false }).waitFor();
+  await page.getByText('Ticket endpoints checked: ORD.', { exact: false }).waitFor();
   await page.getByText('Feb 28, 8:00 AM → Feb 28, 10:00 AM').waitFor();
   await page.getByText('Feb 28, 2099 · 1 traveler · Economy').waitFor();
   await page.locator('a').filter({ hasText: 'Hidden-city' }).waitFor();
@@ -186,7 +186,7 @@ async function runDesktop() {
     throw new Error('Departure sort lost the lowest-price badge.');
   }
   await page.getByText('Save $126.00 versus the $314.00 nonstop fare').waitFor();
-  await page.getByRole('heading', { name: 'Watch this route' }).waitFor();
+  await page.getByText('Board at JFK; exit at DTW.', { exact: false }).waitFor();
   await page.screenshot({ path: `${outDir}/results-desktop.png`, fullPage: true });
   if (!live) {
     expectSearchFailure = true;
@@ -198,6 +198,17 @@ async function runDesktop() {
     if (await page.getByText('$188.00').count()) {
       throw new Error('Stale search results remained after a failed retry.');
     }
+    await page.route('**/api/search', (route) =>
+      route.fulfill({
+        status: 429,
+        json: {
+          error: 'The shared daily search limit has been reached.',
+          resetAt: '2099-03-01T12:00:00Z',
+        },
+      }),
+    );
+    await page.getByRole('button', { name: 'Retry search', exact: true }).click();
+    await page.getByText('Next allowance:', { exact: false }).waitFor();
     expectSearchFailure = false;
     await mockApi(page);
     await page.getByRole('button', { name: 'Retry search', exact: true }).click();
@@ -236,7 +247,7 @@ async function runRecoveryStates() {
   await page.route('**/api/health', (route) =>
     route.fulfill(
       connected
-        ? { json: { capabilities: { search: true, subscriptions: false } } }
+        ? { json: { capabilities: { search: true } } }
         : { status: 503, json: { error: 'Unavailable' } },
     ),
   );
@@ -287,8 +298,7 @@ async function runRecoveryStates() {
   await page.getByText('No itineraries match these filters.').waitFor();
   await page.getByRole('button', { name: 'Show all routes' }).click();
   await page.getByText('€100.00').waitFor();
-  if (await page.getByRole('heading', { name: 'Watch this route' }).count())
-    throw new Error('Partial round trip allowed a price alert.');
+
   if (
     await page
       .locator('html')
@@ -299,32 +309,10 @@ async function runRecoveryStates() {
   await context.close();
 }
 
-async function runDisabledAlerts() {
-  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
-  const page = await context.newPage();
-  monitor(page, 'alerts-disabled');
-  await mockApi(page, false);
-  await page.goto(baseUrl, { waitUntil: 'networkidle' });
-  await page.getByRole('combobox', { name: 'Origin' }).fill('JFK');
-  await page.getByRole('option', { name: /JFK/ }).click();
-  await page.getByRole('combobox', { name: 'Destination' }).fill('DTW');
-  await page.getByRole('option', { name: /DTW/ }).click();
-  await page.locator('#departureDate').fill('2099-02-28');
-  await page.getByRole('button', { name: 'Search flights' }).click();
-  await page.getByText('$188.00').waitFor();
-  await page.screenshot({ path: `${outDir}/alerts-disabled-mobile.png`, fullPage: true });
-  await page.getByText('Price alerts are unavailable right now.', { exact: false }).waitFor();
-  if (await page.getByRole('heading', { name: 'Watch this route' }).count()) {
-    throw new Error('Alert form appeared while subscriptions are disabled.');
-  }
-  await context.close();
-}
-
 try {
   await runDesktop();
   await runMobile();
   if (!live) {
-    await runDisabledAlerts();
     await runRecoveryStates();
   }
   if (failures.length) throw new Error(failures.join('\n'));

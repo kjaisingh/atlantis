@@ -4,8 +4,6 @@ import compression from 'compression';
 import express from 'express';
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
-import * as db from './db.js';
-import * as jobs from './jobs.js';
 import { loadConfig } from './config.js';
 import { createRoutes } from './routes.js';
 import { searchOneWay } from './search.js';
@@ -18,12 +16,7 @@ const pageLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-export function createApp({
-  config = loadConfig(),
-  database = db,
-  jobRunner = jobs,
-  searchFlights = searchOneWay,
-} = {}) {
+export function createApp({ config = loadConfig(), searchFlights = searchOneWay } = {}) {
   const app = express();
   app.disable('x-powered-by');
   app.set('trust proxy', 1);
@@ -57,14 +50,13 @@ export function createApp({
       status: 'ok',
       version: config.commitSha,
       capabilities: {
-        search: config.duffelConfigured,
-        subscriptions: config.subscriptionsEnabled,
+        search: config.searchConfigured,
         databaseConfigured: config.persistenceEnabled,
       },
     });
   });
 
-  app.use('/api', createRoutes({ config, database, jobRunner, searchFlights }));
+  app.use('/api', createRoutes({ config, searchFlights }));
   app.use('/api', (_request, response) => response.status(404).json({ error: 'Not found.' }));
 
   const distDir = path.resolve(__dirname, '../dist');

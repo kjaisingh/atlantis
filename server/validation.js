@@ -1,12 +1,4 @@
 const DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
-function isEmail(value) {
-  if (!value || value.length > 254 || /\s/u.test(value)) return false;
-  const at = value.indexOf('@');
-  if (at <= 0 || at !== value.lastIndexOf('@')) return false;
-  const dot = value.indexOf('.', at + 2);
-  return dot > at + 1 && dot < value.length - 1;
-}
-
 function calendarDate(value) {
   if (typeof value !== 'string') return null;
   const match = DATE_PATTERN.exec(value ?? '');
@@ -66,22 +58,4 @@ export function validateTrip(body, airportSet, now = new Date()) {
   }
 
   return { value: { origin, destination, departureDate, returnDate, travelers } };
-}
-
-export function validateSubscriber(body) {
-  const name = typeof body.name === 'string' ? body.name.trim() : '';
-  const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
-  const priceThreshold = numericInput(body.priceThreshold);
-  const currency = typeof body.currency === 'string' ? body.currency.trim().toUpperCase() : '';
-
-  if (!name || name.length > 120 || !isEmail(email)) {
-    return { error: 'A valid name and email are required.' };
-  }
-  if (!Number.isFinite(priceThreshold) || priceThreshold <= 0 || priceThreshold > 1_000_000) {
-    return { error: 'Price threshold must be between 0 and 1,000,000.' };
-  }
-  if (!/^[A-Z]{3}$/.test(currency)) {
-    return { error: 'Currency must be a three-letter ISO code.' };
-  }
-  return { value: { name, email, priceThreshold, currency } };
 }

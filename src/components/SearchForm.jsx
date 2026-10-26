@@ -147,6 +147,10 @@ export default function SearchForm({ airports, onSearch, loading, disabled }) {
         >
           <Search className="h-4 w-4" /> {loading ? 'Searching…' : 'Search flights'}
         </button>
+        <p className="mt-3 text-center text-xs text-slate-500">
+          Free shared allowance: 10 fresh one-way comparisons daily, 50 per 31 days. Round trips use
+          two; cached fares use none.
+        </p>
         <p className="mt-4 text-center text-xs leading-5 text-slate-600">
           Hidden-city tickets need carry-on only and separate tickets for each direction.{' '}
           <a

@@ -105,8 +105,22 @@ export default function ResultsTable({ title, itineraries, meta }) {
       {meta?.partial && !meta.error && (
         <p className="mt-3 flex items-start gap-2 rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-800">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-          Limited coverage: {meta.succeeded} of {meta.requested} route checks completed
-          {meta.truncated ? `; ${meta.totalCandidates} route combinations are known` : ''}.
+          Limited coverage: {meta.succeeded} of {meta.requested} route checks completed . Only a
+          small set of possible endpoints is checked.
+        </p>
+      )}
+      {meta?.pricedAt && (
+        <p className="mt-2 text-xs text-slate-500">
+          {meta.fareCached ? 'Cached fares' : 'Fares checked'}:{' '}
+          {new Date(meta.pricedAt).toLocaleString()}. Prices may change before booking.
+        </p>
+      )}
+      {meta?.candidates && (
+        <p className="mt-2 text-xs text-slate-500">
+          {meta.candidates.length
+            ? `Ticket endpoints checked: ${meta.candidates.join(', ')}.`
+            : 'No hidden-city candidates are available for this route.'}{' '}
+          Candidate routes refresh after 30 days; fares refresh after 10 minutes.
         </p>
       )}
       {meta?.available > meta?.returned && (
@@ -192,7 +206,10 @@ export default function ResultsTable({ title, itineraries, meta }) {
                   )}
                   {itinerary.isHiddenCity && (
                     <p className="mt-2 text-xs font-medium text-amber-800">
-                      Exit at {itinerary.layoverCity}; skip the remaining flights.
+                      Board at {itinerary.segments?.[0]?.origin || itinerary.path.split(' → ')[0]};
+                      exit at {itinerary.layoverCity}. Ticket ends at{' '}
+                      {itinerary.finalDestination || itinerary.path.split(' → ').at(-1)}; skip the
+                      remaining flights.
                     </p>
                   )}
                 </div>
@@ -202,7 +219,7 @@ export default function ResultsTable({ title, itineraries, meta }) {
                   {formatPrice(itinerary.price, itinerary.currency)}
                 </span>
                 <span className="inline-flex items-center gap-1 text-xs font-semibold text-brand-700">
-                  Review on Kayak <ArrowUpRight className="h-3.5 w-3.5" />
+                  Recheck on Google Flights <ArrowUpRight className="h-3.5 w-3.5" />
                 </span>
               </div>
             </a>

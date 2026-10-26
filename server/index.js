@@ -5,9 +5,8 @@ import { loadConfig } from './config.js';
 const config = loadConfig();
 const server = createApp({ config }).listen(config.port, () => {
   console.log(`Atlantis listening on port ${config.port}`);
-  if (!config.subscriptionsEnabled) {
-    console.warn('[subscriptions] Disabled until both database and SMTP are configured.');
-  }
+  if (!config.searchConfigured)
+    console.warn('[search] Configure SerpApi and Supabase to enable searches.');
 });
 
 function shutdown(signal) {

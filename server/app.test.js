@@ -1,15 +1,13 @@
 import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
 import { createApp } from './app.js';
+import { SearchError } from './errors.js';
 
 const config = {
   commitSha: 'test-sha',
-  duffelConfigured: true,
+  searchConfigured: true,
   persistenceEnabled: false,
-  subscriptionsEnabled: false,
 };
-const database = { isEnabled: () => false };
-const jobRunner = { checkSubscriptions: async () => ({ checked: 0, matched: 0 }) };
 const searchFlights = async () => ({
   itineraries: [{ price: '100', currency: 'USD', nonstop: true }],
   meta: { requested: 1, succeeded: 1, failed: 0, partial: false },
@@ -18,7 +16,7 @@ let server;
 let baseUrl;
 
 before(async () => {
-  const app = createApp({ config, database, jobRunner, searchFlights });
+  const app = createApp({ config, searchFlights });
   server = app.listen(0);
   await new Promise((resolve) => server.once('listening', resolve));
   baseUrl = `http://127.0.0.1:${server.address().port}`;
@@ -32,28 +30,9 @@ test('health exposes safe capabilities and deployment version', async () => {
   assert.deepEqual(await response.json(), {
     status: 'ok',
     version: 'test-sha',
-    capabilities: { search: true, subscriptions: false, databaseConfigured: false },
+    capabilities: { search: true, databaseConfigured: false },
   });
 });
-test('subscription job rejects unauthorized requests and disabled storage', async () => {
-  const unauthorized = await fetch(`${baseUrl}/api/jobs/check-subscriptions`, { method: 'POST' });
-  assert.equal(unauthorized.status, 401);
-
-  const previousSecret = process.env.JOB_SECRET;
-  process.env.JOB_SECRET = 'test-job-secret';
-  try {
-    const unavailable = await fetch(`${baseUrl}/api/jobs/check-subscriptions`, {
-      method: 'POST',
-      headers: { 'x-job-secret': 'test-job-secret' },
-    });
-    assert.equal(unavailable.status, 503);
-    assert.deepEqual(await unavailable.json(), { error: 'Price alerts are not configured.' });
-  } finally {
-    if (previousSecret === undefined) delete process.env.JOB_SECRET;
-    else process.env.JOB_SECRET = previousSecret;
-  }
-});
-
 test('invalid JSON and impossible dates return 400', async () => {
   const invalidJson = await fetch(`${baseUrl}/api/search`, {
     method: 'POST',
@@ -84,15 +63,6 @@ test('oversized JSON returns 413', async () => {
   assert.equal(response.status, 413);
 });
 
-test('subscriptions fail closed when delivery is unavailable', async () => {
-  const response = await fetch(`${baseUrl}/api/subscribe`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: '{}',
-  });
-  assert.equal(response.status, 503);
-});
-
 test('valid search returns result metadata', async () => {
   const response = await fetch(`${baseUrl}/api/search`, {
     method: 'POST',
@@ -110,12 +80,46 @@ test('valid search returns result metadata', async () => {
   assert.equal(body.meta.outbound.partial, false);
 });
 
+test('quota errors preserve the reset time and Retry-After without leaking provider details', async () => {
+  const resetAt = new Date(Date.now() + 60000).toISOString();
+  const limited = createApp({
+    config,
+    searchFlights: async () => {
+      throw new SearchError('Shared daily limit reached.', {
+        status: 429,
+        code: 'daily_limit',
+        resetAt,
+      });
+    },
+  }).listen(0);
+  await new Promise((resolve) => limited.once('listening', resolve));
+  try {
+    const response = await fetch(`http://127.0.0.1:${limited.address().port}/api/search`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        origin: 'JFK',
+        destination: 'DTW',
+        departureDate: '2099-02-28',
+        travelers: 1,
+      }),
+    });
+    assert.equal(response.status, 429);
+    assert.ok(Number(response.headers.get('Retry-After')) > 0);
+    assert.deepEqual(await response.json(), {
+      error: 'Shared daily limit reached.',
+      code: 'daily_limit',
+      resetAt,
+    });
+  } finally {
+    await new Promise((resolve) => limited.close(resolve));
+  }
+});
+
 test('round trips retain the successful direction and identify failed directions', async () => {
   for (const failedOrigin of ['JFK', 'DTW', 'both']) {
     const app = createApp({
       config,
-      database,
-      jobRunner,
       searchFlights: async (origin, _destination, _date, _travelers, options) => {
         assert.ok(options.signal instanceof AbortSignal);
         if (origin === failedOrigin || failedOrigin === 'both')
@@ -143,7 +147,7 @@ test('round trips retain the successful direction and identify failed directions
         const failed = failedOrigin === 'JFK' ? 'outbound' : 'inbound';
         const succeeded = failedOrigin === 'JFK' ? 'inbound' : 'outbound';
         assert.deepEqual(body[failed], []);
-        assert.match(body.meta[failed].error, /could not be checked/);
+        assert.match(body.meta[failed].error, /Flight search failed/);
         assert.equal(body[succeeded].length, 1);
       }
     } finally {

@@ -185,12 +185,9 @@ function SearchApp() {
                   {searchParams.travelers === 1 ? 'traveler' : 'travelers'} · Economy
                 </p>
               </div>
-              <p className="text-sm text-slate-500">Total fare for all travelers, per direction</p>
             </div>
             {results.inbound && (
-              <p className="mt-3 text-sm text-slate-600">
-                Outbound and return are separate one-way tickets. Book each direction separately.
-              </p>
+              <p className="mt-3 text-sm text-slate-600">Book each direction separately.</p>
             )}
             {(results.meta?.outbound?.error || results.meta?.inbound?.error) && (
               <button

@@ -5,35 +5,39 @@ import { SearchError } from './errors.js';
 
 export function createAlertRoutes({ config, alerts, airportSet }) {
   const router = express.Router();
-  const limited = rateLimit({
+  const signupLimit = rateLimit({
     windowMs: 60 * 60_000,
     limit: 10,
     standardHeaders: 'draft-8',
     legacyHeaders: false,
     message: { error: 'Too many alert requests. Please try again in an hour.' },
   });
-  router.use('/alerts', limited, (req, res, next) => {
+  const actionLimit = rateLimit({
+    windowMs: 60 * 60_000,
+    limit: 30,
+    standardHeaders: 'draft-8',
+    legacyHeaders: false,
+    message: { error: 'Too many alert requests. Please try again in an hour.' },
+  });
+  router.use('/alerts', (req, res, next) => {
     res.set('Cache-Control', 'no-store');
     if (!config.alertsConfigured && !(req.path === '/unsubscribe' && config.persistenceEnabled))
       return res.status(503).json({ error: 'Price alerts are not available yet.' });
     next();
   });
-  router.post('/alerts', async (req, res) => {
+  router.post('/alerts', signupLimit, async (req, res) => {
     const result = validateAlert(req.body || {}, airportSet);
     if (result.error) return res.status(400).json({ error: result.error });
     await alerts.subscribe(result.value);
     res.status(202).json({
-      message: 'Check your inbox to confirm a new alert. Existing alerts remain unchanged.',
+      message: 'Check your email to confirm.',
     });
   });
   for (const action of ['verify', 'unsubscribe'])
-    router.post(`/alerts/${action}`, async (req, res) => {
+    router.post(`/alerts/${action}`, actionLimit, async (req, res) => {
       await alerts.action(req.body?.token, action);
       res.json({
-        message:
-          action === 'verify'
-            ? 'Alert confirmed. We will check weekly and email the first matching fare.'
-            : 'Alert cancelled. You will receive no further updates.',
+        message: action === 'verify' ? 'Alert confirmed.' : 'Alert cancelled.',
       });
     });
   router.post(

@@ -85,10 +85,7 @@ export default function ResultsTable({ title, itineraries, meta }) {
         )}
       </div>
       {itineraries.length > 0 && (
-        <p className="mt-2 text-xs text-slate-500" role="status">
-          {visible.length} {visible.length === 1 ? 'option' : 'options'} · {currency} · Times local
-          to each airport
-        </p>
+        <p className="mt-2 text-xs text-slate-500">{currency} · Local airport times</p>
       )}
 
       {meta?.error && (
@@ -111,7 +108,7 @@ export default function ResultsTable({ title, itineraries, meta }) {
       )}
 
       {visible.length === 0 ? (
-        !meta?.error && (
+        (itineraries.length > 0 || !meta?.error) && (
           <div className="py-10 text-center text-sm text-slate-600">
             <p>
               {itineraries.length === 0

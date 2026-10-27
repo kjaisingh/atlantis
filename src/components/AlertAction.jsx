@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { alertAction } from '../lib/api.js';
 
 export default function AlertAction({ action, token }) {
-  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
   const [done, setDone] = useState(false);
   const [pending, setPending] = useState(false);
   const busy = useRef(false);
@@ -10,13 +10,13 @@ export default function AlertAction({ action, token }) {
     if (busy.current) return;
     busy.current = true;
     setPending(true);
+    setError('');
     try {
-      const result = await alertAction(action, token);
-      setMessage(result.message);
+      await alertAction(action, token);
       setDone(true);
       window.history.replaceState(null, '', window.location.pathname);
     } catch (error) {
-      setMessage(error.message);
+      setError(error.message);
     } finally {
       busy.current = false;
       setPending(false);
@@ -27,14 +27,15 @@ export default function AlertAction({ action, token }) {
       <a href="/" className="font-bold text-brand-600">
         Atlantis
       </a>
-      <h1 className="mt-6 text-2xl font-bold">
-        {action === 'verify' ? 'Confirm your price alert' : 'Cancel your price alert'}
+      <h1 className="mt-6 text-2xl font-bold" aria-live="polite">
+        {done
+          ? action === 'verify'
+            ? 'Alert confirmed'
+            : 'Alert cancelled'
+          : action === 'verify'
+            ? 'Confirm price alert'
+            : 'Cancel price alert'}
       </h1>
-      <p className="mt-3 text-slate-600">
-        {action === 'verify'
-          ? 'Activate weekly checks for your requested trip. We’ll email the first fare at or below your target.'
-          : 'Stop future price updates for this alert.'}
-      </p>
       {!done && (
         <button
           type="button"
@@ -45,14 +46,14 @@ export default function AlertAction({ action, token }) {
           {pending ? 'Saving…' : action === 'verify' ? 'Confirm alert' : 'Unsubscribe'}
         </button>
       )}
-      {message && (
-        <p role="status" className="mt-4 text-sm text-slate-700">
-          {message}
+      {error && (
+        <p role="alert" className="mt-4 text-sm text-red-700">
+          {error}
         </p>
       )}
       <p className="mt-6">
         <a className="text-brand-700 underline" href="/">
-          Back to flight search
+          Search flights
         </a>
       </p>
     </main>

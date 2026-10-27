@@ -127,9 +127,7 @@ async function mockApi(page) {
             requested: 4,
             succeeded: 4,
             failed: 0,
-            truncated: false,
-            totalCandidates: 4,
-            partial: true,
+            partial: false,
             fareCached: true,
             pricedAt: '2099-01-01T12:00:00Z',
             candidates: ['ORD'],
@@ -201,7 +199,7 @@ async function runDesktop() {
   if (
     await page
       .getByText(
-        /Cached fares:|Fares checked:|Limited coverage:|Candidate routes refresh|Free shared allowance/,
+        /Cached fares:|Fares checked:|Limited coverage:|Candidate routes refresh|Free shared allowance|Total fare for all travelers|A search aid only|^\d+ options? ·/,
       )
       .count()
   )
@@ -321,6 +319,7 @@ async function runRecoveryStates() {
     ],
     inbound: [],
     meta: {
+      outbound: { partial: true, error: 'Some route checks failed. Retry in a minute.' },
       inbound: {
         partial: true,
         error: 'This direction could not be checked. Please retry your search.',
@@ -404,17 +403,21 @@ async function runAlerts() {
   for (const width of [1280, 390]) {
     const context = await browser.newContext({ viewport: { width, height: 900 } });
     const page = await context.newPage();
-    monitor(page, `alerts-${width}`);
+    monitor(page, `alerts-${width}`, (message) =>
+      message.text().includes('503 (Service Unavailable)'),
+    );
     await mockApi(page);
     await page.route('**/api/ready', (route) =>
       route.fulfill({ json: { ready: true, alerts: true } }),
     );
     let signup;
+    let signups = 0;
     await page.route('**/api/alerts', (route) => {
       signup = route.request().postDataJSON();
+      signups++;
       return route.fulfill({
         status: 202,
-        json: { message: 'Check your inbox to confirm a new alert.' },
+        json: { message: 'Check your email to confirm.' },
       });
     });
     await page.goto(baseUrl);
@@ -428,7 +431,13 @@ async function runAlerts() {
     await form.getByRole('textbox', { name: 'Email', exact: true }).fill('test@example.com');
     await form.getByRole('spinbutton', { name: 'Target total (USD)', exact: true }).fill('200');
     await form.getByRole('button', { name: 'Create price alert' }).click();
-    await form.getByText('Check your inbox to confirm a new alert.').waitFor();
+    await form.getByText('Check your email to confirm.').waitFor();
+    if ((await form.getByRole('textbox').count()) || (await form.getByRole('button').count()))
+      throw new Error('Successful signup retained editable controls.');
+    await form.evaluate((el) =>
+      el.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })),
+    );
+    if (signups !== 1) throw new Error('Successful signup can be resubmitted.');
     if (signup.origin !== 'JFK' || signup.destination !== 'DTW' || signup.priceThreshold !== 200)
       throw new Error('Alert signup lost search details.');
     if (
@@ -440,30 +449,53 @@ async function runAlerts() {
     await page.screenshot({ path: `${outDir}/alerts-${width}.png`, fullPage: true });
     for (const action of ['verify', 'unsubscribe']) {
       let requests = 0;
-      await page.route(`**/api/alerts/${action}`, (route) => {
+      let release;
+      const gate = new Promise((resolve) => {
+        release = resolve;
+      });
+      await page.route(`**/api/alerts/${action}`, async (route) => {
         requests++;
+        if (requests === 1)
+          return route.fulfill({ status: 503, json: { error: 'Please try again.' } });
+        await gate;
         return route.fulfill({
           json: { message: action === 'verify' ? 'Alert confirmed.' : 'Alert cancelled.' },
         });
       });
+      const heading = action === 'verify' ? 'Confirm price alert' : 'Cancel price alert';
       await page.goto(`${baseUrl}/#alert-${action}=${'a'.repeat(64)}`);
+      await page.getByRole('heading', { name: heading, exact: true }).waitFor();
+      if (requests !== 0) throw new Error('Link visit mutated alert before explicit action.');
+      const button = page.getByRole('button', {
+        name: action === 'verify' ? 'Confirm alert' : 'Unsubscribe',
+        exact: true,
+      });
+      await button.click();
+      await page.getByRole('alert').getByText('Please try again.').waitFor();
+      await button.click();
+      const pending = page.getByRole('button', { name: 'Saving…' });
+      await pending.waitFor();
+      if (!(await pending.isDisabled())) throw new Error('Pending alert action remains enabled.');
+      if (await page.getByRole('alert').count())
+        throw new Error('Alert retry retained stale error.');
+      await pending.evaluate((el) =>
+        el.dispatchEvent(new el.ownerDocument.defaultView.MouseEvent('click', { bubbles: true })),
+      );
+      release();
       await page
         .getByRole('heading', {
-          name: action === 'verify' ? 'Confirm your price alert' : 'Cancel your price alert',
-        })
-        .waitFor();
-      if (requests !== 0) throw new Error('Link visit mutated alert before explicit action.');
-      await page
-        .getByRole('button', {
-          name: action === 'verify' ? 'Confirm alert' : 'Unsubscribe',
+          name: action === 'verify' ? 'Alert confirmed' : 'Alert cancelled',
           exact: true,
         })
-        .click();
-      await page
-        .getByText(action === 'verify' ? 'Alert confirmed.' : 'Alert cancelled.', { exact: true })
         .waitFor();
-      if (requests !== 1 || page.url().includes('#alert-'))
+      if (requests !== 2 || page.url().includes('#alert-'))
         throw new Error('Alert action repeated or retained token.');
+      if (
+        (await page.getByRole('button').count()) ||
+        (await page.getByRole('heading', { name: heading, exact: true }).count())
+      )
+        throw new Error('Completed alert still shows action prompt.');
+      await page.screenshot({ path: `${outDir}/alert-${action}-${width}.png`, fullPage: true });
     }
     await context.close();
   }

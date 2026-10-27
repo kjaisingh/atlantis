@@ -122,6 +122,8 @@ test('identical alerts share fares and concurrent jobs cannot duplicate notifica
   assert.equal(h.searches.length, 1);
   assert.equal(h.sent.length, 2);
   assert(h.rows.every((r) => r.state === 'notified'));
+  assert(h.sent.every((mail) => !mail.text.includes('#alert-unsubscribe=')));
+  assert(h.sent.every((mail) => !mail.text.includes('Carry-on')));
   assert.equal((await alerts.check()).checked, 0);
 });
 
@@ -132,8 +134,40 @@ test('round-trip target uses both directions and all travelers from original sea
   assert.equal(h.sent.length, 0);
   assert(h.finishes.every((r) => r.outcome === 'checked'));
   const matching = harness({ roundtrip: true, threshold: 200 });
+  matching.rows.forEach((row) => {
+    row.trip.travelers = 3;
+  });
   await createAlerts({ config, ...matching }).check();
+  assert(matching.searches.every((args) => args[3] === 3));
+  assert.match(matching.sent[0].text, /for 3 travelers/);
   assert.match(matching.sent[0].text, /USD 200.00.*both directions combined/);
+});
+
+test('hidden-city emails identify the boarding airport and skipped destination', async () => {
+  const h = harness();
+  await createAlerts({
+    config,
+    ...h,
+    search: async () => ({
+      itineraries: [
+        {
+          ...fare,
+          path: 'JFK → DTW → ORD',
+          isHiddenCity: true,
+          layoverCity: 'DTW',
+          finalDestination: 'ORD',
+          segments: [
+            { origin: 'JFK', destination: 'DTW' },
+            { origin: 'DTW', destination: 'ORD' },
+          ],
+        },
+      ],
+      meta: {},
+    }),
+  }).check();
+  assert.match(h.sent[0].text, /Board at JFK; exit at DTW\. Ticket ends at ORD/);
+  assert.match(h.sent[0].text, /Carry-on only/);
+  assert(!h.sent[0].text.includes('Book each direction separately'));
 });
 
 test('partial or failed checks defer without sending misleading matches', async () => {
@@ -147,8 +181,40 @@ test('partial or failed checks defer without sending misleading matches', async 
     const result = await createAlerts({ config, ...h, search }).check();
     assert.equal(result.deferred, 2);
     assert.equal(h.sent.length, 0);
-    assert.equal(result.more, false);
+    assert.equal(result.more, true);
   }
+});
+
+test('a deferred group does not stop a later cached alert group', async () => {
+  const h = harness();
+  h.store.claimAlerts = async (owner) => {
+    const row = h.rows.find((r) => r.state === 'active' && !r.owner);
+    if (!row) return [];
+    row.owner = owner;
+    return [{ ...row }];
+  };
+  let searches = 0;
+  const alerts = createAlerts({
+    config,
+    ...h,
+    search: async () => {
+      if (++searches === 1) throw Error('provider unavailable');
+      return { itineraries: [fare], meta: { fareCached: true } };
+    },
+  });
+  const batches = [];
+  for (let i = 0; i < 10; i++) {
+    const result = await alerts.check();
+    batches.push(result);
+    if (!result.more) break;
+  }
+  assert.equal(batches.length, 3);
+  assert.equal(batches[0].deferred, 1);
+  assert.equal(batches[1].notified, 1);
+  assert.equal(batches[2].checked, 0);
+  assert.equal(searches, 2);
+  assert.equal(h.sent.length, 1);
+  assert.equal(h.sent[0].to, h.rows[1].email);
 });
 
 test('unsubscribe wins before email preparation', async () => {
@@ -190,6 +256,7 @@ test('Brevo uses HTTPS and saved idempotency; no implicit retry or secret error 
     to: 'test@example.com',
     subject: 'subject',
     text: '<img src=x> https://example.com/#alert-verify=token',
+    links: { 'https://example.com/#alert-verify=token': 'Confirm <alert>' },
     key: 'unique',
   });
   assert.equal(request.url, 'https://api.brevo.com/v3/smtp/email');
@@ -197,7 +264,14 @@ test('Brevo uses HTTPS and saved idempotency; no implicit retry or secret error 
   const html = JSON.parse(request.options.body).htmlContent;
   assert(!html.includes('<img'));
   assert(html.includes('&lt;img src=x&gt;'));
-  assert(html.includes('<a href="https://example.com/#alert-verify=token">'));
+  assert(
+    html.includes('<a href="https://example.com/#alert-verify=token">Confirm &lt;alert&gt;</a>'),
+  );
+  assert(
+    JSON.parse(request.options.body).textContent.includes(
+      'https://example.com/#alert-verify=token',
+    ),
+  );
 
   for (const status of [400, 429, 500])
     await assert.rejects(
@@ -293,6 +367,41 @@ test('confirmation rejection releases signup while ambiguous delivery retains it
       (e) => e.status === 503,
     );
     assert.equal(cleaned, !ambiguous);
+  }
+});
+
+test('signup rate limit does not block confirmation or unsubscribe', async () => {
+  const actions = [];
+  const app = createApp({
+    config: { ...config },
+    alerts: {
+      subscribe: async () => {},
+      action: async (_token, action) => actions.push(action),
+    },
+  });
+  const server = app.listen(0);
+  await new Promise((resolve) => server.once('listening', resolve));
+  const post = (path, body) =>
+    fetch(`http://127.0.0.1:${server.address().port}/api${path}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  try {
+    for (let i = 0; i < 10; i++)
+      assert.equal(
+        (await post('/alerts', { ...trip, email: 'test@example.com', priceThreshold: 100 })).status,
+        202,
+      );
+    assert.equal(
+      (await post('/alerts', { ...trip, email: 'test@example.com', priceThreshold: 100 })).status,
+      429,
+    );
+    for (const action of ['verify', 'unsubscribe'])
+      assert.equal((await post(`/alerts/${action}`, { token: 'a'.repeat(64) })).status, 200);
+    assert.deepEqual(actions, ['verify', 'unsubscribe']);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
   }
 });
 

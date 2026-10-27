@@ -23,8 +23,7 @@ export default function Hero() {
           </h1>
 
           <p className="mx-auto mt-5 max-w-xl text-lg text-slate-600 lg:mx-0">
-            Atlantis searches hidden-city itineraries: flights where your real destination is just a
-            layover on a cheaper ticket to somewhere further out.
+            Compare direct fares with tickets that connect through your destination.
           </p>
 
           <div className="mt-8 flex justify-center lg:justify-start">

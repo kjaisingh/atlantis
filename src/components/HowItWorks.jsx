@@ -1,20 +1,20 @@
-import { Search, Ticket, Wallet } from 'lucide-react';
+import { Search, Ticket, PlaneLanding } from 'lucide-react';
 
 const steps = [
   {
     icon: Search,
-    title: 'We search layovers, not just direct flights',
-    body: 'Airlines often price a flight to a far-away city cheaper than a direct flight to a closer one it connects through.',
+    title: 'Find a connection',
+    body: 'We check tickets that start at your airport and connect through your destination.',
   },
   {
     icon: Ticket,
-    title: 'You book the cheaper, longer ticket',
-    body: 'Your real destination is the layover city. You just get off there, skip the final leg, and skip checked bags too.',
+    title: 'Compare fares',
+    body: 'A ticket beyond your destination can cost less than flying there directly.',
   },
   {
-    icon: Wallet,
-    title: 'You pocket the difference',
-    body: 'Same seat, same airline, often the same day. All for less than the "obvious" ticket would cost.',
+    icon: PlaneLanding,
+    title: 'Exit at the layover',
+    body: 'Recheck the ticket on Google Flights. Board at the first airport and skip the flights after your destination.',
   },
 ];
 
@@ -24,9 +24,6 @@ export default function HowItWorks() {
       <div className="mx-auto max-w-5xl px-4 sm:px-6">
         <div className="mx-auto max-w-xl text-center">
           <h2 className="text-3xl font-bold text-slate-900">How hidden-city fares work</h2>
-          <p className="mt-3 text-slate-600">
-            Compare carefully. Hidden-city travel has important tradeoffs.
-          </p>
         </div>
 
         <div className="mt-12 grid gap-8 sm:grid-cols-3">

@@ -1,4 +1,4 @@
-function emailHtml(text) {
+function emailHtml(text, links) {
   const escape = (value) =>
     value
       .replaceAll('&', '&amp;')
@@ -9,7 +9,9 @@ function emailHtml(text) {
   const content = text
     .split(/(https:\/\/[^\s]+)/g)
     .map((part) =>
-      part.startsWith('https://') ? `<a href="${escape(part)}">${escape(part)}</a>` : escape(part),
+      part.startsWith('https://')
+        ? `<a href="${escape(part)}">${escape(links[part] || part)}</a>`
+        : escape(part),
     )
     .join('');
   return `<div style="font-family:sans-serif;white-space:pre-wrap;overflow-wrap:anywhere">${content}</div>`;
@@ -23,7 +25,7 @@ export class DeliveryError extends Error {
 }
 
 export function createMailer({ emailKey, emailFrom }, fetcher = fetch) {
-  return async function send({ to, subject, text, key }) {
+  return async function send({ to, subject, text, key, links = {} }) {
     let response;
     try {
       response = await fetcher('https://api.brevo.com/v3/smtp/email', {
@@ -34,7 +36,7 @@ export function createMailer({ emailKey, emailFrom }, fetcher = fetch) {
           to: [{ email: to }],
           subject,
           textContent: text,
-          htmlContent: emailHtml(text),
+          htmlContent: emailHtml(text, links),
           headers: { idempotencyKey: key },
         }),
         signal: AbortSignal.timeout(10_000),

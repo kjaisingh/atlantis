@@ -45,7 +45,7 @@ function describeFare(fare, label) {
     (fare.isHiddenCity
       ? `Board at ${fare.segments[0].origin}; exit at ${fare.layoverCity}. Ticket ends at ${fare.finalDestination}; skip remaining flights.\n`
       : '') +
-    `Recheck on Google Flights: ${fare.bookingLink}`
+    fare.bookingLink
   );
 }
 
@@ -65,12 +65,15 @@ export function createAlerts({ config, store, search, send = createMailer(config
         p_unsubscribe: hashToken(alertToken(id, 'unsubscribe', config.jobSecret)),
       });
       if (!row?.id) return;
+      const verifyUrl = link(id, 'verify');
+      const cancelUrl = link(id, 'unsubscribe');
       try {
         await send({
           to: email,
           key: id,
           subject: 'Confirm your Atlantis price alert',
-          text: `Confirm your weekly alert for ${trip.origin} → ${trip.destination}, ${trip.departureDate}${trip.returnDate ? ` through ${trip.returnDate}` : ''}, ${trip.travelers} traveler(s), at or below USD ${threshold.toFixed(2)} total.\n\n${link(id, 'verify')}\n\nThis confirmation expires in 24 hours. Checks depend on free search capacity. We send one matching fare, then stop; alerts expire after departure day.\n\nIf you did not request this, ignore this email or cancel: ${link(id, 'unsubscribe')}`,
+          text: `${trip.origin} → ${trip.destination} · ${trip.departureDate}${trip.returnDate ? ` – ${trip.returnDate}` : ''} · ${trip.travelers} ${trip.travelers === 1 ? 'traveler' : 'travelers'}\nTarget: USD ${threshold.toFixed(2)} total${trip.returnDate ? ', both directions' : ''}.\n\nConfirm within 24 hours:\n${verifyUrl}\n\nChecked weekly. One matching fare, then the alert stops.\n\nDidn't request this? Ignore this email.\n${cancelUrl}`,
+          links: { [verifyUrl]: 'Confirm alert', [cancelUrl]: 'Unsubscribe' },
         });
       } catch (error) {
         if (error.ambiguous === false) await store.finishAlert(id, null, 'confirmation_rejected');
@@ -118,7 +121,7 @@ export function createAlerts({ config, store, search, send = createMailer(config
           notified: 0,
           deferred: rows.length,
           unknown: 0,
-          more: false,
+          more: true,
         };
       }
       const out = cheapest(outbound),
@@ -140,7 +143,11 @@ export function createAlerts({ config, store, search, send = createMailer(config
               to: row.email,
               key: row.delivery_key,
               subject: `Atlantis price match: ${trip.origin} → ${trip.destination}`,
-              text: `Found a fare at USD ${total.toFixed(2)} for ${trip.travelers} traveler(s)${back ? ', both directions combined' : ''}. Your target: USD ${Number(row.threshold).toFixed(2)}.\n\n${describeFare(out, 'Outbound')}${back ? `\n\n${describeFare(back, 'Return')}` : ''}\n\nPrices may change. Book each direction separately. Hidden-city travel requires boarding at the first airport, carry-on baggage only, and checking airline and transit rules.\n\nThis one-time alert is now complete. Cancel alert: ${link(row.id, 'unsubscribe')}`,
+              text: `USD ${total.toFixed(2)} for ${trip.travelers} ${trip.travelers === 1 ? 'traveler' : 'travelers'}${back ? ', both directions combined' : ''}. Target: USD ${Number(row.threshold).toFixed(2)}.\n\n${describeFare(out, 'Outbound')}${back ? `\n\n${describeFare(back, 'Return')}\n\nBook each direction separately.` : ''}${out.isHiddenCity || back?.isHiddenCity ? '\n\nCarry-on only. Check airline and transit rules before booking.' : ''}\n\nRecheck the fare before booking. This alert is complete.`,
+              links: {
+                [out.bookingLink]: 'Google Flights',
+                ...(back ? { [back.bookingLink]: 'Google Flights' } : {}),
+              },
             });
             await store.finishAlert(row.id, owner, 'notified');
             summary.notified++;

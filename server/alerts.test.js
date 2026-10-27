@@ -247,6 +247,9 @@ test('alert APIs gate signup, validate requests, and authenticate scheduled jobs
       400,
     );
     assert.equal(subscribed, 1);
+    for (let i = 0; i < 28; i++) await post('/jobs/check-alerts', {});
+    assert.equal((await post('/jobs/check-alerts', {})).status, 429);
+    assert.equal(checked, 1);
     config.alertsConfigured = false;
     assert.equal((await post('/alerts/unsubscribe', { token: 'a'.repeat(64) })).status, 200);
     assert.equal(

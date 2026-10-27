@@ -36,14 +36,24 @@ export function createAlertRoutes({ config, alerts, airportSet }) {
             : 'Alert cancelled. You will receive no further updates.',
       });
     });
-  router.post('/jobs/check-alerts', async (req, res) => {
-    res.set('Cache-Control', 'no-store');
-    if (!authorizedJob(req.get('Authorization'), config.jobSecret))
-      return res.status(401).json({ error: 'Unauthorized.' });
-    if (!config.alertsConfigured)
-      return res.status(503).json({ error: 'Price alerts are not configured.' });
-    res.json(await alerts.check());
-  });
+  router.post(
+    '/jobs/check-alerts',
+    rateLimit({
+      windowMs: 60_000,
+      limit: 30,
+      standardHeaders: 'draft-8',
+      legacyHeaders: false,
+      message: { error: 'Too many scheduler requests. Please try again in a minute.' },
+    }),
+    async (req, res) => {
+      res.set('Cache-Control', 'no-store');
+      if (!authorizedJob(req.get('Authorization'), config.jobSecret))
+        return res.status(401).json({ error: 'Unauthorized.' });
+      if (!config.alertsConfigured)
+        return res.status(503).json({ error: 'Price alerts are not configured.' });
+      res.json(await alerts.check());
+    },
+  );
   router.use((error, _req, res, _next) => {
     void _next;
     res.status(error instanceof SearchError ? error.status : 503).json({

@@ -186,20 +186,30 @@ test('Brevo uses HTTPS and saved idempotency; no implicit retry or secret error 
       request = { url, options };
       return Response.json({ messageId: 'ok' }, { status: 201 });
     },
-  )({ to: 'test@example.com', subject: 'subject', text: 'text', key: 'unique' });
+  )({
+    to: 'test@example.com',
+    subject: 'subject',
+    text: '<img src=x> https://example.com/#alert-verify=token',
+    key: 'unique',
+  });
   assert.equal(request.url, 'https://api.brevo.com/v3/smtp/email');
   assert.equal(JSON.parse(request.options.body).headers.idempotencyKey, 'unique');
+  const html = JSON.parse(request.options.body).htmlContent;
+  assert(!html.includes('<img'));
+  assert(html.includes('&lt;img src=x&gt;'));
+  assert(html.includes('<a href="https://example.com/#alert-verify=token">'));
+
   for (const status of [400, 429, 500])
     await assert.rejects(
       createMailer({}, async () =>
         Response.json({ message: 'private provider details' }, { status }),
-      )({}),
+      )({ text: 'test' }),
       (e) => e.ambiguous === status >= 500 && !e.message.includes('private'),
     );
   await assert.rejects(
     createMailer({}, async () => {
       throw Error('socket');
-    })({}),
+    })({ text: 'test' }),
     (e) => e.ambiguous === true,
   );
 });

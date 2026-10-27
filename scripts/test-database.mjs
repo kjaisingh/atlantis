@@ -9,12 +9,12 @@ const schemas = [
   await readSql('schema.sql'),
   (await readSql('migrations/20261026_search_cache.sql')) +
     '\n' +
-    (await readSql('migrations/20261026_search_reliability.sql')),
+    (await readSql('migrations/20261026_search_reliability.sql')) +
+    '\n' +
+    (await readSql('migrations/20261026_price_alerts.sql')),
 ];
-const assertions = await readFile(
-  new URL('../supabase/tests/search-cache.sql', import.meta.url),
-  'utf8',
-);
+const assertions =
+  (await readSql('tests/search-cache.sql')) + '\n' + (await readSql('tests/price-alerts.sql'));
 const directory = await mkdtemp(join(tmpdir(), 'atlantis-db-test-'));
 try {
   const path = join(directory, 'test.sql');

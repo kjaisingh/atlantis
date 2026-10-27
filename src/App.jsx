@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { AlertCircle, SearchX } from 'lucide-react';
+import SubscribeForm from './components/SubscribeForm.jsx';
+import AlertAction from './components/AlertAction.jsx';
 import Navbar from './components/Navbar.jsx';
 import Hero from './components/Hero.jsx';
 import HowItWorks from './components/HowItWorks.jsx';
@@ -11,6 +13,17 @@ import { getAirports, getReadiness, searchFlights } from './lib/api.js';
 import { formatDate } from './lib/format.js';
 
 export default function App() {
+  const readLink = () => /^#alert-(verify|unsubscribe)=([a-f0-9]{64})$/.exec(window.location.hash);
+  const [link, setLink] = useState(readLink);
+  useEffect(() => {
+    const changed = () => setLink(readLink());
+    window.addEventListener('hashchange', changed);
+    return () => window.removeEventListener('hashchange', changed);
+  }, []);
+  return link ? <AlertAction key={link[0]} action={link[1]} token={link[2]} /> : <SearchApp />;
+}
+
+function SearchApp() {
   const [airports, setAirports] = useState([]);
   const [capabilities, setCapabilities] = useState({ search: false });
   const [directoryError, setDirectoryError] = useState(null);
@@ -35,7 +48,7 @@ export default function App() {
         if (airportResult.status === 'fulfilled') setAirports(airportResult.value);
         else setDirectoryError('Airport directory failed to load. Please retry.');
         if (healthResult.status === 'fulfilled' && healthResult.value.ready) {
-          setCapabilities({ search: true });
+          setCapabilities({ search: true, alerts: healthResult.value.alerts });
         } else {
           setCapabilities({ search: false });
           setServiceError('Flight search is unavailable right now. Please try again later.');
@@ -202,6 +215,9 @@ export default function App() {
                 itineraries={results.inbound}
                 meta={results.meta?.inbound}
               />
+            )}
+            {capabilities.alerts && (
+              <SubscribeForm key={JSON.stringify(searchParams)} searchParams={searchParams} />
             )}
           </section>
         )}

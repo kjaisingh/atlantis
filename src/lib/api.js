@@ -46,3 +46,11 @@ export function getAirports(options) {
 export function searchFlights(params, options) {
   return request('/search', { ...options, method: 'POST', body: JSON.stringify(params) });
 }
+
+export function subscribe(params) {
+  return request('/alerts', { method: 'POST', body: JSON.stringify(params) });
+}
+
+export function alertAction(action, token) {
+  return request(`/alerts/${action}`, { method: 'POST', body: JSON.stringify({ token }) });
+}

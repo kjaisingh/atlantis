@@ -12,7 +12,12 @@ function cachedFailure(result) {
   );
 }
 
-export function createSearch({ store, lookup = oneWayLookup, now = () => Date.now() }) {
+export function createSearch({
+  store,
+  lookup = oneWayLookup,
+  now = () => Date.now(),
+  alert = false,
+}) {
   return async function search(origin, destination, date, travelers, options = {}) {
     const signal = options.signal
       ? AbortSignal.any([options.signal, AbortSignal.timeout(SEARCH_TIMEOUT_MS)])
@@ -46,7 +51,12 @@ export function createSearch({ store, lookup = oneWayLookup, now = () => Date.no
       .digest('hex');
     const owner = randomUUID();
     signal.throwIfAborted();
-    const claim = await store.claim(key, owner, endpoints.length, dbOptions);
+    const claim = await (alert ? store.claimAlert : store.claim)(
+      key,
+      owner,
+      endpoints.length,
+      dbOptions,
+    );
     const cached = (result) => ({ ...result, meta: { ...result.meta, fareCached: true } });
     if (claim.status === 'ready') return cached(claim.result);
     if (claim.status === 'limited')
@@ -140,4 +150,8 @@ export function createSearch({ store, lookup = oneWayLookup, now = () => Date.no
 
 export function searchOneWay(...args) {
   return createSearch({ store: getStore() })(...args);
+}
+
+export function searchAlertOneWay(...args) {
+  return createSearch({ store: getStore(), alert: true })(...args);
 }

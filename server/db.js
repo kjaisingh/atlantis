@@ -54,6 +54,13 @@ export function createStore(client) {
       ),
     claim: (key, owner, calls, options) =>
       rpc('atlantis_claim_search', { p_key: key, p_owner: owner, p_calls: calls }, options),
+    claimAlert: (key, owner, calls, options) =>
+      rpc('atlantis_claim_alert_search', { p_key: key, p_owner: owner, p_calls: calls }, options),
+    createAlert: (params) => rpc('atlantis_create_alert', params),
+    alertAction: (hash, action) => rpc('atlantis_alert_action', { p_hash: hash, p_action: action }),
+    claimAlerts: (owner) => rpc('atlantis_claim_alerts', { p_owner: owner }),
+    finishAlert: (id, owner, outcome) =>
+      rpc('atlantis_finish_alert', { p_id: id, p_owner: owner, p_outcome: outcome }),
     getFare: (key, options) =>
       result(table('atlantis_fare_cache').select('*').eq('key', key).maybeSingle(), options),
     finish: (key, owner, payload, failed = false, options) =>

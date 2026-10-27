@@ -30,7 +30,7 @@ test('health exposes safe capabilities and deployment version', async () => {
   assert.deepEqual(await response.json(), {
     status: 'ok',
     version: 'test-sha',
-    capabilities: { search: true, databaseConfigured: false },
+    capabilities: { search: true, alerts: false, databaseConfigured: false },
   });
 });
 

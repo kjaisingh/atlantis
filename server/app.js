@@ -6,7 +6,8 @@ import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import { loadConfig } from './config.js';
 import { createRoutes } from './routes.js';
-import { searchOneWay } from './search.js';
+import { createAlerts } from './alerts.js';
+import { searchOneWay, searchAlertOneWay } from './search.js';
 import { getStore } from './db.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -21,6 +22,7 @@ export function createApp({
   config = loadConfig(),
   searchFlights = searchOneWay,
   readiness = () => getStore().readiness(),
+  alerts = createAlerts({ config, store: getStore(), search: searchAlertOneWay }),
 } = {}) {
   const app = express();
   app.disable('x-powered-by');
@@ -57,6 +59,7 @@ export function createApp({
       version: config.commitSha,
       capabilities: {
         search: config.searchConfigured,
+        alerts: Boolean(config.alertsConfigured),
         databaseConfigured: config.persistenceEnabled,
       },
     });
@@ -74,12 +77,14 @@ export function createApp({
         .catch(() => ({ ready: false }));
     }
     const result = await readyCheck;
-    response
-      .status(result?.ready ? 200 : 503)
-      .json({ ready: Boolean(result?.ready), version: config.commitSha });
+    response.status(result?.ready ? 200 : 503).json({
+      ready: Boolean(result?.ready),
+      version: config.commitSha,
+      alerts: Boolean(config.alertsConfigured),
+    });
   });
 
-  app.use('/api', createRoutes({ config, searchFlights }));
+  app.use('/api', createRoutes({ config, searchFlights, alerts }));
   app.use('/api', (_request, response) => response.status(404).json({ error: 'Not found.' }));
 
   const distDir = path.resolve(__dirname, '../dist');

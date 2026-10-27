@@ -400,12 +400,82 @@ async function runPendingSearch() {
   }
 }
 
+async function runAlerts() {
+  for (const width of [1280, 390]) {
+    const context = await browser.newContext({ viewport: { width, height: 900 } });
+    const page = await context.newPage();
+    monitor(page, `alerts-${width}`);
+    await mockApi(page);
+    await page.route('**/api/ready', (route) =>
+      route.fulfill({ json: { ready: true, alerts: true } }),
+    );
+    let signup;
+    await page.route('**/api/alerts', (route) => {
+      signup = route.request().postDataJSON();
+      return route.fulfill({
+        status: 202,
+        json: { message: 'Check your inbox to confirm a new alert.' },
+      });
+    });
+    await page.goto(baseUrl);
+    await page.getByRole('combobox', { name: 'Origin' }).fill('JFK');
+    await page.getByRole('option', { name: /^JFK / }).click();
+    await page.getByRole('combobox', { name: 'Destination' }).fill('DTW');
+    await page.getByRole('option', { name: /^DTW / }).click();
+    await page.locator('#departureDate').fill('2099-02-28');
+    await page.getByRole('button', { name: 'Search flights', exact: true }).click();
+    const form = page.getByRole('form', { name: 'Price alert' });
+    await form.getByRole('textbox', { name: 'Email', exact: true }).fill('test@example.com');
+    await form.getByRole('spinbutton', { name: 'Target total (USD)', exact: true }).fill('200');
+    await form.getByRole('button', { name: 'Create price alert' }).click();
+    await form.getByText('Check your inbox to confirm a new alert.').waitFor();
+    if (signup.origin !== 'JFK' || signup.destination !== 'DTW' || signup.priceThreshold !== 200)
+      throw new Error('Alert signup lost search details.');
+    if (
+      await page
+        .locator('html')
+        .evaluate((el) => el.scrollWidth > el.ownerDocument.defaultView.innerWidth)
+    )
+      throw new Error('Alert form overflows mobile width.');
+    await page.screenshot({ path: `${outDir}/alerts-${width}.png`, fullPage: true });
+    for (const action of ['verify', 'unsubscribe']) {
+      let requests = 0;
+      await page.route(`**/api/alerts/${action}`, (route) => {
+        requests++;
+        return route.fulfill({
+          json: { message: action === 'verify' ? 'Alert confirmed.' : 'Alert cancelled.' },
+        });
+      });
+      await page.goto(`${baseUrl}/#alert-${action}=${'a'.repeat(64)}`);
+      await page
+        .getByRole('heading', {
+          name: action === 'verify' ? 'Confirm your price alert' : 'Cancel your price alert',
+        })
+        .waitFor();
+      if (requests !== 0) throw new Error('Link visit mutated alert before explicit action.');
+      await page
+        .getByRole('button', {
+          name: action === 'verify' ? 'Confirm alert' : 'Unsubscribe',
+          exact: true,
+        })
+        .click();
+      await page
+        .getByText(action === 'verify' ? 'Alert confirmed.' : 'Alert cancelled.', { exact: true })
+        .waitFor();
+      if (requests !== 1 || page.url().includes('#alert-'))
+        throw new Error('Alert action repeated or retained token.');
+    }
+    await context.close();
+  }
+}
+
 try {
   await runDesktop();
   await runMobile();
   if (!live) {
     await runRecoveryStates();
     await runPendingSearch();
+    await runAlerts();
   }
   if (failures.length) throw new Error(failures.join('\n'));
   console.log(`Smoke test passed. Screenshots: ${outDir}`);

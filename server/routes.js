@@ -3,6 +3,7 @@ import express from 'express';
 import rateLimit from 'express-rate-limit';
 import { validateTrip } from './validation.js';
 import { SEARCH_TIMEOUT_MS } from './serpapi.js';
+import { createAlertRoutes } from './alert-routes.js';
 import { publicError } from './errors.js';
 
 const readJson = (name) =>
@@ -44,8 +45,9 @@ export function selectResults(items) {
   });
 }
 
-export function createRoutes({ config, searchFlights }) {
+export function createRoutes({ config, searchFlights, alerts }) {
   const router = express.Router();
+  router.use(createAlertRoutes({ config, alerts, airportSet }));
   router.get('/airports', (_req, res) => res.json(directory));
   router.post(
     '/search',

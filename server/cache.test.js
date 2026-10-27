@@ -256,3 +256,21 @@ test('budget exhaustion and storage failure prevent any provider calls', async (
   await assert.rejects(run(createSearch(h)), /storage down/);
   assert.equal(h.queries, 0);
 });
+
+test('alert searches use their restricted reservation while sharing the existing fare cache', async () => {
+  const h = harness();
+  let claims = 0;
+  h.store.claimAlert = async (...args) => {
+    claims++;
+    return h.store.claim(...args);
+  };
+  const alert = createSearch({ ...h, alert: true });
+  await run(alert);
+  assert.equal(claims, 1);
+  assert.equal((await run(createSearch(h))).meta.fareCached, true);
+  assert.equal(h.queries, 3);
+  h.advance(600000);
+  h.store.claimAlert = async () => ({ status: 'limited', code: 'alert_limit' });
+  await assert.rejects(run(alert), (error) => error.status === 429);
+  assert.equal(h.queries, 3);
+});
